@@ -5,8 +5,9 @@
 [![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](https://reactjs.org/)
 [![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
-> Proyecto desarrollado por el equipo **ACEIS** (Asociación Centro de Estudios de Ingeniería de Sistemas)
-> de la **Universidad Popular del Cesar**.
+> Proyecto desarrollado por el equipo **ACEIS** (Asociación Centro de Estudios de Ingeniería de Sistemas) de la **Universidad Popular del Cesar**.
+>
+> Este trabajo fue creado para competir en el evento **20CCC Cartagena 2026**, que se realizará del **12 al 14 de agosto de 2026**.
 
 Sistema completo de riego agrícola autónomo que combina un dron Crazyflie con sensores de humedad del suelo, procesamiento de datos en tiempo real y una interfaz web progresiva (PWA) para monitoreo y control remoto.
 
