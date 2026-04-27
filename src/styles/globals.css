@@ -1,0 +1,435 @@
+/* ============================================
+   AGRODRON PWA - Sistema de Riego Autónomo
+   Paleta de colores según rúbrica CSS
+   ============================================ */
+
+:root {
+  /* Fondo oscuro profundo */
+  --bg: #0d0d14;
+  --bg-card: #16161f;
+  --bg-elevated: #1e1e2a;
+  
+  /* Gradiente principal */
+  --gradient-start: #FF5E57;
+  --gradient-end: #AF52DE;
+  --gradient-main: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  
+  /* Niveles de humedad (lv0-lv5) */
+  --lv0: #FF3B30; /* Crítico - rojo */
+  --lv1: #FF9500; /* Bajo - naranja */
+  --lv2: #FFCC00; /* Medio bajo - amarillo */
+  --lv3: #34C759; /* Óptimo - esmeralda */
+  --lv4: #00C7BE; /* Alto - turquesa */
+  --lv5: #AF52DE; /* Saturado - púrpura */
+  
+  /* Textos */
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0b0;
+  --text-muted: #6b6b7b;
+  
+  /* Tipografías */
+  --font-heading: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  
+  /* Efectos */
+  --blur-amount: 12px;
+  --border-radius: 16px;
+  --border-radius-sm: 8px;
+}
+
+/* Reset y base */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* App container */
+.app-container {
+  min-height: 100vh;
+  padding-bottom: 2rem;
+}
+
+.main-content {
+  padding-top: 100px;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+/* Título principal con gradiente */
+.main-title {
+  font-family: var(--font-heading);
+  font-size: clamp(2.5rem, 8vw, 4rem);
+  font-weight: 800;
+  background: var(--gradient-main);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  font-weight: 400;
+}
+
+/* Glass effect para cards */
+.glass {
+  background: rgba(22, 22, 31, 0.8);
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--border-radius);
+}
+
+.glass-subtle {
+  background: rgba(30, 30, 42, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--border-radius-sm);
+}
+
+/* Animaciones fadeUp */
+.fade-up {
+  animation: fadeUp 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.3s; }
+.delay-4 { animation-delay: 0.4s; }
+.delay-5 { animation-delay: 0.5s; }
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Score Bar para humedad */
+.score-bar-container {
+  width: 100%;
+  height: 12px;
+  background: var(--bg);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.score-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.5s ease, background-color 0.3s ease;
+}
+
+.score-bar-fill.lv0 { background: var(--lv0); }
+.score-bar-fill.lv1 { background: var(--lv1); }
+.score-bar-fill.lv2 { background: var(--lv2); }
+.score-bar-fill.lv3 { background: var(--lv3); }
+.score-bar-fill.lv4 { background: var(--lv4); }
+.score-bar-fill.lv5 { background: var(--lv5); }
+
+/* Big Score Typography */
+.big-score {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.big-score.strategic {
+  background: linear-gradient(135deg, var(--lv3), var(--lv4));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.big-score.opportune {
+  background: linear-gradient(135deg, var(--lv1), var(--lv0));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Level Buttons */
+.level-btn {
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius-sm);
+  border: none;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white;
+}
+
+.level-btn.lv0 { background: var(--lv0); }
+.level-btn.lv1 { background: var(--lv1); }
+.level-btn.lv2 { background: var(--lv2); color: #1a1a1a; }
+.level-btn.lv3 { background: var(--lv3); }
+.level-btn.lv4 { background: var(--lv4); }
+.level-btn.lv5 { background: var(--lv5); }
+
+.level-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.level-btn.active {
+  box-shadow: 0 0 20px currentColor;
+}
+
+/* Mission Button */
+.mission-btn {
+  width: 100%;
+  padding: 1.25rem 2rem;
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: none;
+  border-radius: var(--border-radius);
+  background: var(--gradient-main);
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.mission-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(255, 94, 87, 0.4);
+}
+
+.mission-btn:active {
+  transform: translateY(0);
+}
+
+.mission-btn.active {
+  background: linear-gradient(135deg, var(--lv3), var(--lv4));
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(52, 199, 89, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(52, 199, 89, 0.6);
+  }
+}
+
+/* Telemetry Bar */
+.telemetry-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding: 0.75rem 1.5rem;
+}
+
+.telemetry-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.telemetry-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.telemetry-value {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Status indicators */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: blink 1.5s infinite;
+}
+
+.status-dot.online { background: var(--lv3); }
+.status-dot.warning { background: var(--lv1); }
+.status-dot.offline { background: var(--lv0); }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Map Container */
+.map-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/10;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+.map-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.map-overlay {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 10;
+}
+
+/* Drone indicator */
+.drone-icon {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  transform: translate(-50%, -50%);
+  transition: all 0.3s ease;
+  z-index: 20;
+}
+
+.drone-icon.flying {
+  animation: drone-hover 1s ease-in-out infinite;
+}
+
+@keyframes drone-hover {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-5px); }
+}
+
+/* Node markers */
+.node-marker {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: white;
+  z-index: 15;
+  transition: all 0.3s ease;
+}
+
+.node-marker:hover {
+  transform: translate(-50%, -50%) scale(1.2);
+  z-index: 25;
+}
+
+/* Panel cards */
+.panel-card {
+  padding: 1.5rem;
+}
+
+.panel-title {
+  font-family: var(--font-heading);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+/* Humidity history mini chart */
+.humidity-history {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 40px;
+  margin-top: 1rem;
+}
+
+.history-bar {
+  flex: 1;
+  border-radius: 2px;
+  transition: height 0.3s ease, background-color 0.3s ease;
+  min-height: 4px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+  .main-content {
+    padding-top: 120px;
+  }
+  
+  .telemetry-bar {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 576px) {
+  .main-content {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .panel-card {
+    padding: 1rem;
+  }
+  
+  .big-score {
+    font-size: 1.75rem;
+  }
+}
+
+/* Override Bootstrap dark theme */
+.btn-close {
+  filter: invert(1);
+}
+
+.form-control, .form-select {
+  background-color: var(--bg);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.form-control:focus, .form-select:focus {
+  background-color: var(--bg-elevated);
+  border-color: var(--gradient-start);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 0.25rem rgba(255, 94, 87, 0.25);
+}
