@@ -5,7 +5,8 @@
 [![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](https://reactjs.org/)
 [![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
-> **Universidad Popular del Cesar** - Proyecto de Sistema Inteligente de Control Autónomo para Drones de Riego
+> Proyecto desarrollado por el equipo **ACEIS** (Asociación Centro de Estudios de Ingeniería de Sistemas)
+> de la **Universidad Popular del Cesar**.
 
 Sistema completo de riego agrícola autónomo que combina un dron Crazyflie con sensores de humedad del suelo, procesamiento de datos en tiempo real y una interfaz web progresiva (PWA) para monitoreo y control remoto.
 
@@ -266,6 +267,7 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 
 ## 🙏 Agradecimientos
 
+- **ACEIS** - Asociación Centro de Estudios de Ingeniería de Sistemas, Universidad Popular del Cesar
 - **Universidad Popular del Cesar** - Institución educativa
 - **NASA SMAP** - Datos satelitales de humedad del suelo
 - **Bitcraze AB** - Crazyflie drone platform
@@ -273,7 +275,7 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 
 ## 📞 Contacto
 
-**Universidad Popular del Cesar**
+**ACEIS - Asociación Centro de Estudios de Ingeniería de Sistemas**
 - Proyecto: Sistema de Riego Autónomo con Drones
 - Email: [contacto@unicesar.edu.co](mailto:contacto@unicesar.edu.co)
 - GitHub: [@unicesar](https://github.com/unicesar)
