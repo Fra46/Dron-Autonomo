@@ -3,7 +3,8 @@ import { TelemetryCommand } from './commands'
 export type TelemetrySocketCommand = TelemetryCommand
 
 export interface TelemetrySocket {
-  sendCommand: (command: TelemetrySocketCommand) => void
+  sendCommand: (command: TelemetrySocketCommand) => boolean
+  readyState: () => number
   close: () => void
 }
 
@@ -44,8 +45,11 @@ export function createTelemetrySocket(
     sendCommand: command => {
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(command))
+        return true
       }
+      return false
     },
+    readyState: () => socket.readyState,
     close: () => {
       if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
         socket.close()

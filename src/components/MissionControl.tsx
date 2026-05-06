@@ -2,7 +2,15 @@ import { useTelemetryContext } from '@/contexts/TelemetryContext'
 
 export default function MissionControl() {
   const { telemetry, startMission, stopMission } = useTelemetryContext()
-  const missionActive = telemetry.drone.flightStatus !== 'idle' && telemetry.drone.flightStatus !== 'descenso'
+  const status = telemetry.drone.flightStatus
+  const isReturning = status === 'retorno'
+  const missionActive = ['ascenso', 'navegando', 'regando', 'retorno'].includes(status)
+  const canStop = ['ascenso', 'navegando', 'regando'].includes(status)
+  const buttonLabel = isReturning
+    ? 'Regresando a base...'
+    : missionActive
+    ? 'Detener Misión'
+    : 'Iniciar Misión Autónoma'
 
   return (
     <div className="glass panel-card">
@@ -10,30 +18,25 @@ export default function MissionControl() {
       
       <button
         className={`mission-btn ${missionActive ? 'active' : ''}`}
+        disabled={isReturning}
         onClick={() => {
-          if (missionActive) stopMission()
-          else startMission('sur')
+          if (!missionActive) {
+            startMission('sur')
+          } else if (canStop) {
+            stopMission()
+          }
         }}
       >
-        {missionActive ? (
-          <>
-            <span style={{ marginRight: '0.5rem' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="2"/>
-              </svg>
-            </span>
-            Detener Misión
-          </>
-        ) : (
-          <>
-            <span style={{ marginRight: '0.5rem' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5,3 19,12 5,21"/>
-              </svg>
-            </span>
-            Iniciar Misión Autónoma
-          </>
-        )}
+        <span style={{ marginRight: '0.5rem' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            {missionActive ? (
+              <rect x="6" y="6" width="12" height="12" rx="2"/>
+            ) : (
+              <polygon points="5,3 19,12 5,21"/>
+            )}
+          </svg>
+        </span>
+        {buttonLabel}
       </button>
 
       {!missionActive && (
@@ -53,7 +56,9 @@ export default function MissionControl() {
         <div className="mt-3">
           <div className="d-flex justify-content-between align-items-center">
             <small style={{ color: 'var(--text-secondary)' }}>Progreso de misión</small>
-            <small style={{ color: 'var(--lv3)' }}>En curso...</small>
+            <small style={{ color: 'var(--lv3)' }}>
+              {isReturning ? 'Regresando...' : 'En curso...'}
+            </small>
           </div>
           <div className="score-bar-container mt-2">
             <div 

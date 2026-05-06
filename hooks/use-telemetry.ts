@@ -35,6 +35,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
   const [isSimulating, setIsSimulating] = useState(false)
   
   const socketRef = useRef<ReturnType<typeof createTelemetrySocket> | null>(null)
+  const commandQueueRef = useRef<TelemetrySocketCommand[]>([])
   const simulationRef = useRef<NodeJS.Timeout | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -81,6 +82,12 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
         setIsConnected(true)
         setConnectionError(null)
         stopSimulation()
+
+        if (commandQueueRef.current.length > 0) {
+          console.log('[Telemetry] Enviando comandos encolados:', commandQueueRef.current)
+          commandQueueRef.current.forEach(command => socket.sendCommand(command))
+          commandQueueRef.current = []
+        }
       },
       onMessage: (message) => {
         console.log('[Telemetry] Mensaje recibido:', message)
@@ -129,12 +136,28 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
   // Send command to drone
   const sendCommand = useCallback((command: TelemetrySocketCommand) => {
     if (socketRef.current) {
-      socketRef.current.sendCommand(command)
-      console.log('[Telemetry] Comando enviado:', command)
-    } else {
-      console.warn('[Telemetry] No conectado, comando no enviado')
+      const sent = socketRef.current.sendCommand(command)
+      if (sent) {
+        console.log('[Telemetry] Comando enviado:', command)
+        return
+      }
+
+      console.warn('[Telemetry] Socket no abierto, encolando comando:', command)
+      commandQueueRef.current.push(command)
+
+      const readyState = socketRef.current.readyState()
+      if (readyState === WebSocket.CLOSED || readyState === WebSocket.CLOSING) {
+        socketRef.current = null
+      }
+
+      connect()
+      return
     }
-  }, [])
+
+    console.warn('[Telemetry] No conectado, encolando comando:', command)
+    commandQueueRef.current.push(command)
+    connect()
+  }, [connect])
 
   const startMission = useCallback((targetZone?: string) => {
     sendCommand({ type: 'start_mission', target_zone: targetZone ?? 'sur' })

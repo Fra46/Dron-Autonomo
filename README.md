@@ -108,6 +108,28 @@ pip install websockets
 pip install earthaccess h5py numpy
 ```
 
+### 📖 Configuración de Credenciales NASA (Importante ⭐)
+
+Si quieres usar **datos reales del satélite SMAP de NASA**, consulta:
+- **[NASA_CREDENTIALS.md](./scripts/NASA_CREDENTIALS.md)** — Guía paso a paso para autenticación
+
+Para EarthAccess usa estas variables:
+- `EARTHDATA_USERNAME`
+- `EARTHDATA_PASSWORD`
+- o `EARTHDATA_TOKEN`
+
+El script también acepta los alias `EARTHACCESS_USERNAME`, `EARTHACCESS_PASSWORD` y `EARTHACCESS_TOKEN`.
+
+Si no configuras credenciales, el sistema fallback automáticamente a modo simulación.
+
+### ✨ Mejoras Recientes
+
+Revisa **[MEJORAS_SISTEMA_SENSORES.md](./scripts/MEJORAS_SISTEMA_SENSORES.md)** para:
+- Solución a problemas de congelación en sensor NASA
+- Fallback automático a datos simulados
+- Mejor logging y debugging
+- Troubleshooting completo
+
 ### 4. Configurar Webots (Opcional)
 
 1. Instalar [Webots R2023b+](https://cyberbotics.com/)
@@ -116,36 +138,43 @@ pip install earthaccess h5py numpy
 
 ## 📖 Uso
 
-### Inicio Rápido
+### Inicio Rápido (Recomendado 🚀)
 
-1. **Iniciar el Puente UDP-WebSocket:**
-   ```bash
-   cd scripts
-   python udp_websocket_bridge.py
-   ```
+**Terminal 1 — Bridge UDP-WebSocket:**
+```bash
+cd scripts
+python udp_websocket_bridge.py
+```
 
-2. **Iniciar Simulador de Sensores:**
-   ```bash
-   # Terminal separado
-   python sensor_mock.py
-   ```
+**Terminal 2 — Sensor de datos:**
+```bash
+# Opción A: Datos simulados (rápido, sin dependencias)
+python sensor_mock.py
 
-3. **Abrir la PWA:**
-   - Navegar a `http://localhost:3000`
-   - La interfaz se conectará automáticamente al WebSocket
+# Opción B: Datos reales NASA (requiere credenciales)
+python sensor_nasa.py
+# → Si no hay credenciales, usa fallback a simulación automáticamente
+```
+
+**Terminal 3 — PWA Frontend:**
+```bash
+# En la raíz del proyecto
+pnpm dev
+# Abrir: http://localhost:3000
+```
 
 ### Modos de Operación
 
-#### Modo Simulación (Predeterminado)
-- Si no hay conexión UDP, la PWA entra automáticamente en modo SIM
-- Genera datos aleatorios para testing
+| Modo | Comando | Datos | Velocidad | Requisitos |
+|------|---------|-------|-----------|-----------|
+| **Simulación** | `sensor_mock.py` | Aleatorios realistas | ⚡ Rápido | Ninguno |
+| **NASA SMAP Real** | `sensor_nasa.py` | Satélite real | 🐢 Lento (1a) | Credenciales NASA |
+| **Simulación Completa** | Webots + `crazyflie_controller.py` | Física realista | 🐢 Muy lento | Webots instalado |
+| **Dev/Testing** | Sin sensor, PWA en SIM | Mock local | ⚡⚡ Instántaneo | Nada |
 
-#### Modo Datos Reales
-- Con `sensor_mock.py`: Datos simulados realistas
-- Con `sensor_nasa.py`: Datos satelitales SMAP de la NASA
+✅ **Nota:** Si `sensor_nasa.py` no tiene credenciales, **automáticamente cambia a datos simulados.**
 
-#### Modo Simulación Completa
-- Webots + Crazyflie controller para simulación física
+### Modos de Operación (Anterior - Para Referencia)
 
 ## 📁 Estructura del Proyecto
 

@@ -12,7 +12,7 @@ const FLIGHT_STATUS_LABELS: Record<string, string> = {
 
 export default function TelemetryBar() {
   const { telemetry, isConnected, connectionError } = useTelemetryContext()
-  const missionActive = telemetry.drone.flightStatus !== 'idle' && telemetry.drone.flightStatus !== 'descenso'
+  const missionActive = ['ascenso', 'navegando', 'regando', 'retorno'].includes(telemetry.drone.flightStatus)
 
   const battery = telemetry.drone.battery ?? 100
   const signal = telemetry.signal ?? 0
