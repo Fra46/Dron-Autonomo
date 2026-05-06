@@ -69,10 +69,10 @@ def generar_datos(zona: dict) -> dict:
 
 
 # ── Bucle principal ───────────────────────────────────────────────────────────
-print("=" * 55)
-print("  SIMULADOR DE SENSORES — DRONE DE RIEGO (Crazyflie)")
-print("  Destino:", DESTINO_IP, "| Puerto:", DESTINO_PUERTO)
-print("=" * 55)
+print("=" * 70)
+print("🤖 SIMULADOR DE SENSORES — DRONE DE RIEGO (Crazyflie)")
+print("=" * 70)
+print(f"📡 Transmitiendo a: {DESTINO_IP}:{DESTINO_PUERTO}")
 print()
 
 try:
@@ -88,16 +88,16 @@ try:
         estado_emoji = {
             "humedo"  : "💧",
             "normal"  : "✅",
-            "seco"    : "⚠️ ",
+            "seco"    : "⚠️",
             "muy_seco": "🔴",
         }.get(datos["estado_suelo"], "?")
 
         print(
-            f"  {estado_emoji}  Zona: {datos['zona']:<8} | "
-            f"Humedad: {datos['humedad']:>3}% | "
-            f"Temp: {datos['temperatura']:>4}°C | "
-            f"Batería: {datos['bateria']:>3}% | "
-            f"Estado: {datos['estado_suelo']}"
+            f"  {estado_emoji} Zona: {datos['zona']:<8} | "
+            f"💧 Humedad: {datos['humedad']:>3}% | "
+            f"🌡️ Temp: {datos['temperatura']:>4}°C | "
+            f"🔋 Batería: {datos['bateria']:>3}% | "
+            f"🌱 Estado: {datos['estado_suelo']}"
         )
 
         time.sleep(1)   # Una lectura por segundo 
@@ -106,6 +106,7 @@ try:
 
 except KeyboardInterrupt:
     print()
-    print("Simulación detenida por el usuario.")
+    print("⏹️ Simulación detenida por el usuario.")
 finally:
     sock.close()
+    print("✅ Socket cerrado.")

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ButtonGroup, Button } from 'react-bootstrap'
+import { useTelemetryContext } from '@/contexts/TelemetryContext'
 
 interface MapContainerProps {
   missionActive: boolean
@@ -62,12 +63,29 @@ const INITIAL_NODES: SensorNode[] = [
 ]
 
 export default function MapContainer({ missionActive, onHumidityChange }: MapContainerProps) {
+  const { telemetry } = useTelemetryContext()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [nodes, setNodes] = useState<SensorNode[]>(INITIAL_NODES)
   const [dronePosition, setDronePosition] = useState({ x: 50, y: 95 })
   const [showGrid, setShowGrid] = useState(true)
   const [isIrrigating, setIsIrrigating] = useState(false)
+
+  // Actualizar nodos desde telemetry del WebSocket
+  useEffect(() => {
+    const zonesData = telemetry.zones
+    setNodes(prev => [
+      { ...prev[0], humidity: zonesData.norte.humedad },
+      { ...prev[1], humidity: zonesData.norte.humedad },
+      { ...prev[2], humidity: zonesData.norte.humedad },
+      { ...prev[3], humidity: zonesData.centro.humedad },
+      { ...prev[4], humidity: zonesData.centro.humedad },
+      { ...prev[5], humidity: zonesData.centro.humedad },
+      { ...prev[6], humidity: zonesData.sur.humedad },
+      { ...prev[7], humidity: zonesData.sur.humedad },
+      { ...prev[8], humidity: zonesData.sur.humedad },
+    ])
+  }, [telemetry.zones])
 
   // Simulación de movimiento del dron
   useEffect(() => {

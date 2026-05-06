@@ -20,7 +20,8 @@ import socket
 import websockets
 from datetime import datetime
 from typing import Set
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
+from datetime import datetime, timedelta
 
 # ── Configuración de red ──────────────────────────────────────────────────────
 UDP_HOST = "0.0.0.0"
@@ -48,10 +49,13 @@ class DroneState:
     position: dict = None
     target_zone: str = None
     water_level: int = 100
+    status_timestamp: datetime = field(default_factory=datetime.now)
     
     def __post_init__(self):
         if self.position is None:
             self.position = {"x": 0.0, "y": 0.0, "z": 0.0}
+        if not isinstance(self.status_timestamp, datetime):
+            self.status_timestamp = datetime.now()
 
 # Estado actual
 zone_readings = {
@@ -120,12 +124,29 @@ def procesar_datos_sensor(datos: dict) -> dict:
     avg_humidity = sum(z["humedad"] for z in zone_readings.values()) / len(zone_readings)
     
     # Simular estado del dron basado en humedad
-    if estado == "muy_seco" and drone_state.flight_status == "idle":
+    if drone_state.flight_status == "idle" and estado == "muy_seco":
         drone_state.flight_status = "ascenso"
         drone_state.target_zone = zona
+    elif drone_state.flight_status == "ascenso":
+        # Después de despegar, el dron navega hacia la zona objetivo
+        drone_state.flight_status = "navegando"
+    elif drone_state.flight_status == "navegando" and estado == "muy_seco":
+        drone_state.flight_status = "regando"
     elif drone_state.flight_status == "regando" and estado in ["normal", "humedo"]:
         drone_state.flight_status = "retorno"
-    
+        drone_state.status_timestamp = datetime.now()
+    elif drone_state.flight_status == "retorno":
+        # Transitar automaticamente a descenso despues de 3 segundos
+        if datetime.now() - drone_state.status_timestamp > timedelta(seconds=3):
+            drone_state.flight_status = "descenso"
+            drone_state.status_timestamp = datetime.now()
+    elif drone_state.flight_status == "descenso":
+        # Completar descenso despues de 2 segundos
+        if datetime.now() - drone_state.status_timestamp > timedelta(seconds=2):
+            drone_state.flight_status = "idle"
+            drone_state.target_zone = None
+            drone_state.status_timestamp = datetime.now()
+
     # Construir paquete de telemetria para la PWA
     return {
         "type": "telemetry_update",

@@ -8,7 +8,7 @@ import MissionControl from './components/MissionControl'
 
 function AppContent() {
   const { telemetry } = useTelemetryContext()
-  const missionActive = telemetry.drone.flightStatus !== 'idle' && telemetry.drone.flightStatus !== 'descenso'
+  const missionActive = ['ascenso', 'navegando', 'regando', 'retorno'].includes(telemetry.drone.flightStatus)
 
   return (
     <div className="app-container">
