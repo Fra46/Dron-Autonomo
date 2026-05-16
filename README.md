@@ -303,13 +303,6 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 - **Bitcraze AB** - Crazyflie drone platform
 - **Cyberbotics** - Webots simulation software
 
-## 📞 Contacto
-
-**ACEIS - Asociación Centro de Estudios de Ingeniería de Sistemas**
-- Proyecto: Sistema de Riego Autónomo con Drones
-- Email: [contacto@unicesar.edu.co](mailto:contacto@unicesar.edu.co)
-- GitHub: [@unicesar](https://github.com/unicesar)
-
 ---
 
 ⭐ **Si este proyecto te resulta útil, ¡dale una estrella!**</content>
