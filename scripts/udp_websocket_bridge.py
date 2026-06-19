@@ -57,6 +57,13 @@ class DroneState:
         if not isinstance(self.status_timestamp, datetime):
             self.status_timestamp = datetime.now()
 
+
+def drone_state_to_dict(state: DroneState) -> dict:
+    data = asdict(state)
+    if isinstance(data.get("status_timestamp"), datetime):
+        data["status_timestamp"] = data["status_timestamp"].isoformat()
+    return data
+
 # Estado actual
 zone_readings = {
     "norte":  {"humedad": 75, "estado": "humedo", "temperatura": 30.0},
@@ -99,6 +106,13 @@ def procesar_datos_sensor(datos: dict) -> dict:
     humedad = float(datos.get("humedad", 50))
     estado = datos.get("estado_suelo", "normal")
     temperatura = float(datos.get("temperatura", 30.0))
+    probe_id = datos.get("probe_id")
+    send_ts = None
+    if datos.get("send_ts") is not None:
+        try:
+            send_ts = float(datos.get("send_ts"))
+        except (TypeError, ValueError):
+            send_ts = None
     
     # Actualizar lecturas de zona
     zone_readings[zona] = {
@@ -108,13 +122,18 @@ def procesar_datos_sensor(datos: dict) -> dict:
     }
     
     # Agregar al historial
-    reading_history.append({
+    entry = {
         "zona": zona,
         "humedad": humedad,
         "estado": estado,
         "temperatura": temperatura,
         "timestamp": datetime.now().isoformat(),
-    })
+    }
+    if probe_id is not None:
+        entry["probe_id"] = probe_id
+    if send_ts is not None:
+        entry["send_ts"] = send_ts
+    reading_history.append(entry)
     
     # Mantener solo las ultimas 100 lecturas
     if len(reading_history) > 100:
@@ -174,6 +193,8 @@ def procesar_datos_sensor(datos: dict) -> dict:
             "humedad": humedad,
             "estado": estado,
             "temperatura": temperatura,
+            "probe_id": probe_id,
+            "send_ts": send_ts,
         },
         "history": reading_history[-10:],  # Ultimas 10 lecturas
     }
@@ -233,7 +254,7 @@ async def websocket_handler(websocket: websockets.WebSocketServerProtocol):
             "zones": zone_readings,
             "humidityZones": calcular_zonas_humedad(),
             "averageHumidity": sum(z["humedad"] for z in zone_readings.values()) / len(zone_readings),
-            "drone": asdict(drone_state),
+            "drone": drone_state_to_dict(drone_state),
             "history": reading_history[-10:],
         }
         await websocket.send(json.dumps(initial_state))
@@ -274,7 +295,7 @@ async def handle_pwa_command(websocket, command: dict):
         status = {
             "type": "status_response",
             "zones": zone_readings,
-            "drone": asdict(drone_state),
+            "drone": drone_state_to_dict(drone_state),
             "humidityZones": calcular_zonas_humedad(),
         }
         await websocket.send(json.dumps(status))
@@ -282,7 +303,7 @@ async def handle_pwa_command(websocket, command: dict):
     # Notificar a todos los clientes del cambio de estado
     update = {
         "type": "drone_status_update",
-        "drone": asdict(drone_state),
+        "drone": drone_state_to_dict(drone_state),
     }
     for client in connected_clients:
         await client.send(json.dumps(update))
