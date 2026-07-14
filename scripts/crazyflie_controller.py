@@ -21,7 +21,7 @@ import math                    # Para operaciones trigonométricas (cos, sin, sq
 # El controlador escucha en TODAS las interfaces de red ("0.0.0.0")
 # en el puerto 5005, esperando paquetes JSON del sensor_nasa.py
 UDP_IP   = "0.0.0.0"
-UDP_PORT = 5005
+UDP_PORT = 5006
 
 # ── 2. PARÁMETROS DE VUELO ───────────────────────────────────────────────────
 ALTURA_OBJETIVO = 1.0    # Altura de crucero en metros (el dron vuela a esta altura)

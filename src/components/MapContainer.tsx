@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useMemo, useEffect, useRef, useCallback, useState } from 'react'
 import { ButtonGroup, Button } from 'react-bootstrap'
 import { useTelemetryContext } from '@/contexts/TelemetryContext'
 
@@ -7,15 +7,21 @@ interface MapContainerProps {
   onHumidityChange?: (humidity: number) => void
 }
 
-interface SensorNode {
-  id: number
+interface ZoneNode {
+  id: 'norte' | 'centro' | 'sur'
   x: number
   y: number
+  label: string
   humidity: number
 }
 
-// Colores hex para canvas
-const HUMIDITY_COLORS = {
+const ZONE_LAYOUT: Record<ZoneNode['id'], { x: number; y: number }> = {
+  norte: { x: 50, y: 20 },
+  centro: { x: 50, y: 50 },
+  sur: { x: 50, y: 80 },
+}
+
+const HUMIDITY_COLORS: Record<string, string> = {
   lv0: '#FF3B30',
   lv1: '#FF9500',
   lv2: '#FFCC00',
@@ -25,20 +31,8 @@ const HUMIDITY_COLORS = {
 }
 
 const getHumidityColor = (humidity: number, forCanvas = false) => {
-  if (forCanvas) {
-    if (humidity < 25) return HUMIDITY_COLORS.lv0
-    if (humidity < 40) return HUMIDITY_COLORS.lv1
-    if (humidity < 55) return HUMIDITY_COLORS.lv2
-    if (humidity < 70) return HUMIDITY_COLORS.lv3
-    if (humidity < 85) return HUMIDITY_COLORS.lv4
-    return HUMIDITY_COLORS.lv5
-  }
-  if (humidity < 25) return 'var(--lv0)'
-  if (humidity < 40) return 'var(--lv1)'
-  if (humidity < 55) return 'var(--lv2)'
-  if (humidity < 70) return 'var(--lv3)'
-  if (humidity < 85) return 'var(--lv4)'
-  return 'var(--lv5)'
+  const color = HUMIDITY_COLORS[getHumidityLevel(humidity)]
+  return forCanvas ? color : `var(--${getHumidityLevel(humidity)})`
 }
 
 const getHumidityLevel = (humidity: number) => {
@@ -50,97 +44,64 @@ const getHumidityLevel = (humidity: number) => {
   return 'lv5'
 }
 
-const INITIAL_NODES: SensorNode[] = [
-  { id: 1, x: 15, y: 20, humidity: 35 },
-  { id: 2, x: 50, y: 15, humidity: 62 },
-  { id: 3, x: 85, y: 20, humidity: 45 },
-  { id: 4, x: 20, y: 50, humidity: 28 },
-  { id: 5, x: 50, y: 50, humidity: 55 },
-  { id: 6, x: 80, y: 50, humidity: 72 },
-  { id: 7, x: 15, y: 80, humidity: 88 },
-  { id: 8, x: 50, y: 85, humidity: 40 },
-  { id: 9, x: 85, y: 80, humidity: 33 },
-]
-
 export default function MapContainer({ missionActive, onHumidityChange }: MapContainerProps) {
   const { telemetry } = useTelemetryContext()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [nodes, setNodes] = useState<SensorNode[]>(INITIAL_NODES)
-  const [dronePosition, setDronePosition] = useState({ x: 50, y: 95 })
   const [showGrid, setShowGrid] = useState(true)
-  const [isIrrigating, setIsIrrigating] = useState(false)
 
-  // Actualizar nodos desde telemetry del WebSocket
-  useEffect(() => {
-    const zonesData = telemetry.zones
-    setNodes(prev => [
-      { ...prev[0], humidity: zonesData.norte.humedad },
-      { ...prev[1], humidity: zonesData.norte.humedad },
-      { ...prev[2], humidity: zonesData.norte.humedad },
-      { ...prev[3], humidity: zonesData.centro.humedad },
-      { ...prev[4], humidity: zonesData.centro.humedad },
-      { ...prev[5], humidity: zonesData.centro.humedad },
-      { ...prev[6], humidity: zonesData.sur.humedad },
-      { ...prev[7], humidity: zonesData.sur.humedad },
-      { ...prev[8], humidity: zonesData.sur.humedad },
-    ])
-  }, [telemetry.zones])
+  const zones: ZoneNode[] = useMemo(
+    () => [
+      { id: 'norte', label: 'Norte', ...ZONE_LAYOUT.norte, humidity: telemetry.zones.norte.humedad },
+      { id: 'centro', label: 'Centro', ...ZONE_LAYOUT.centro, humidity: telemetry.zones.centro.humedad },
+      { id: 'sur', label: 'Sur', ...ZONE_LAYOUT.sur, humidity: telemetry.zones.sur.humedad },
+    ],
+    [telemetry.zones]
+  )
 
-  // Simulación de movimiento del dron
-  useEffect(() => {
-    if (!missionActive) {
-      setDronePosition({ x: 50, y: 95 })
-      setIsIrrigating(false)
-      return
-    }
+  const dronePosition = useMemo(
+    () => ({
+      x: Math.max(
+        0,
+        Math.min(
+          100,
+          typeof telemetry.drone.position.latitude === 'number'
+            ? telemetry.drone.position.latitude
+            : 50,
+        ),
+      ),
+      y: Math.max(
+        0,
+        Math.min(
+          100,
+          typeof telemetry.drone.position.longitude === 'number'
+            ? telemetry.drone.position.longitude
+            : 95,
+        ),
+      ),
+    }),
+    [telemetry.drone.position.latitude, telemetry.drone.position.longitude]
+  )
 
-    let nodeIndex = 0
-    const visitNodes = () => {
-      if (nodeIndex < nodes.length) {
-        const target = nodes[nodeIndex]
-        setDronePosition({ x: target.x, y: target.y })
-        
-        setTimeout(() => {
-          setIsIrrigating(true)
-          setNodes(prev => prev.map((n, i) => 
-            i === nodeIndex ? { ...n, humidity: Math.min(95, n.humidity + 15 + Math.random() * 10) } : n
-          ))
-          setTimeout(() => {
-            setIsIrrigating(false)
-            nodeIndex++
-            visitNodes()
-          }, 1500)
-        }, 1000)
-      } else {
-        setDronePosition({ x: 50, y: 95 })
+  const targetZone = telemetry.drone.targetZone ?? 'centro'
+  const targetPosition = useMemo(() => {
+    const hasValidTarget = typeof telemetry.targetPosition?.latitude === 'number' && typeof telemetry.targetPosition?.longitude === 'number'
+    if (hasValidTarget) {
+      return {
+        x: telemetry.targetPosition.latitude,
+        y: telemetry.targetPosition.longitude,
       }
     }
 
-    const timeout = setTimeout(visitNodes, 1000)
-    return () => clearTimeout(timeout)
-  }, [missionActive, nodes.length])
+    const fallback = ZONE_LAYOUT[targetZone as ZoneNode['id']] ?? ZONE_LAYOUT.centro
+    return { x: fallback.x, y: fallback.y }
+  }, [telemetry.targetPosition, targetZone])
 
-  // Calcular humedad promedio
   useEffect(() => {
-    const avgHumidity = nodes.reduce((sum, n) => sum + n.humidity, 0) / nodes.length
-    if (onHumidityChange) {
-      onHumidityChange(avgHumidity)
-    }
-  }, [nodes, onHumidityChange])
+    const avgHumidity = zones.reduce((sum, zone) => sum + zone.humidity, 0) / zones.length
+    onHumidityChange?.(avgHumidity)
+  }, [zones, onHumidityChange])
 
-  // Simulación de variación de humedad
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNodes(prev => prev.map(node => ({
-        ...node,
-        humidity: Math.max(10, Math.min(95, node.humidity + (Math.random() - 0.6) * 2))
-      })))
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Dibujar canvas
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current
     const container = containerRef.current
@@ -149,15 +110,12 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
     const rect = container.getBoundingClientRect()
     canvas.width = rect.width
     canvas.height = rect.height
-    
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Fondo
     ctx.fillStyle = '#0d0d14'
     ctx.fillRect(0, 0, rect.width, rect.height)
 
-    // Grid
     if (showGrid) {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'
       ctx.lineWidth = 1
@@ -176,56 +134,50 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
       }
     }
 
-    // Zonas de humedad
-    nodes.forEach(node => {
-      const x = (node.x / 100) * rect.width
-      const y = (node.y / 100) * rect.height
-      const radius = 60
-      
+    zones.forEach(zone => {
+      const x = (zone.x / 100) * rect.width
+      const y = (zone.y / 100) * rect.height
+      const radius = 55
+      const color = getHumidityColor(zone.humidity, true)
+
       const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius)
-      const color = getHumidityColor(node.humidity, true)
-      gradient.addColorStop(0, color + '66')
-      gradient.addColorStop(0.5, color + '33')
+      gradient.addColorStop(0, `${color}cc`)
+      gradient.addColorStop(0.55, `${color}55`)
       gradient.addColorStop(1, 'rgba(0,0,0,0)')
-      
       ctx.fillStyle = gradient
       ctx.beginPath()
       ctx.arc(x, y, radius, 0, Math.PI * 2)
       ctx.fill()
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(x, y, 16, 0, Math.PI * 2)
+      ctx.stroke()
     })
 
-    // Área de cultivo
+    if (telemetry.drone.flightStatus !== 'idle') {
+      const droneX = (dronePosition.x / 100) * rect.width
+      const droneY = (dronePosition.y / 100) * rect.height
+      const targetX = (targetPosition.x / 100) * rect.width
+      const targetY = (targetPosition.y / 100) * rect.height
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)'
+      ctx.lineWidth = 2
+      ctx.setLineDash([8, 6])
+      ctx.beginPath()
+      ctx.moveTo(droneX, droneY)
+      ctx.lineTo(targetX, targetY)
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
+
     ctx.strokeStyle = 'rgba(175, 82, 222, 0.5)'
     ctx.lineWidth = 2
     ctx.setLineDash([10, 5])
-    ctx.beginPath()
-    const padding = 30
-    ctx.moveTo(padding, padding)
-    ctx.lineTo(rect.width - padding, padding)
-    ctx.lineTo(rect.width - padding, rect.height - padding)
-    ctx.lineTo(padding, rect.height - padding)
-    ctx.closePath()
-    ctx.stroke()
+    ctx.strokeRect(20, 20, rect.width - 40, rect.height - 40)
     ctx.setLineDash([])
-
-    // Efecto de riego
-    if (isIrrigating) {
-      const droneX = (dronePosition.x / 100) * rect.width
-      const droneY = (dronePosition.y / 100) * rect.height
-      
-      for (let i = 0; i < 12; i++) {
-        const angle = (i / 12) * Math.PI * 2
-        const dist = 20 + Math.random() * 30
-        const dropX = droneX + Math.cos(angle) * dist
-        const dropY = droneY + Math.sin(angle) * dist + 20
-        
-        ctx.fillStyle = 'rgba(0, 199, 190, 0.6)'
-        ctx.beginPath()
-        ctx.arc(dropX, dropY, 2 + Math.random() * 2, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
-  }, [nodes, showGrid, isIrrigating, dronePosition])
+  }, [zones, showGrid, dronePosition, targetPosition, telemetry.drone.flightStatus])
 
   useEffect(() => {
     drawCanvas()
@@ -237,9 +189,9 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
   return (
     <div className="glass panel-card">
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h3 className="panel-title mb-0">Mapa de Cultivo</h3>
+        <h3 className="panel-title">Mapa de Cultivo</h3>
         <ButtonGroup size="sm">
-          <Button 
+          <Button
             variant={showGrid ? 'outline-light' : 'dark'}
             onClick={() => setShowGrid(!showGrid)}
             style={{ fontSize: '0.75rem' }}
@@ -248,54 +200,39 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
           </Button>
         </ButtonGroup>
       </div>
-      
-      <div 
+
+      <div
         ref={containerRef}
         className="map-container"
         style={{ border: '1px solid rgba(255,255,255,0.1)' }}
       >
         <canvas ref={canvasRef} className="map-canvas" />
-        
-        {/* Nodos de sensores */}
-        {nodes.map(node => (
+
+        {zones.map(zone => (
           <div
-            key={node.id}
-            className={`node-marker ${getHumidityLevel(node.humidity)}`}
+            key={zone.id}
+            className={`node-marker ${getHumidityLevel(zone.humidity)}`}
             style={{
-              left: `${node.x}%`,
-              top: `${node.y}%`,
-              backgroundColor: getHumidityColor(node.humidity),
+              left: `${zone.x}%`,
+              top: `${zone.y}%`,
+              backgroundColor: getHumidityColor(zone.humidity),
             }}
-            title={`Nodo ${node.id}: ${node.humidity.toFixed(0)}%`}
+            title={`${zone.label}: ${zone.humidity.toFixed(0)}%`}
           >
-            {node.id}
+            {zone.label}
           </div>
         ))}
 
-        {/* Dron */}
         <div
           className={`drone-icon ${missionActive ? 'flying' : ''}`}
           style={{
             left: `${dronePosition.x}%`,
             top: `${dronePosition.y}%`,
           }}
+          title={`Dron - ${telemetry.drone.flightStatus}`}
         >
           <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="20" cy="20" r="8" fill="url(#droneGradient)" />
-            <circle cx="8" cy="8" r="5" stroke="#FF5E57" strokeWidth="2" fill="none">
-              <animate attributeName="r" values="4;6;4" dur="0.5s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="32" cy="8" r="5" stroke="#FF5E57" strokeWidth="2" fill="none">
-              <animate attributeName="r" values="4;6;4" dur="0.5s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="8" cy="32" r="5" stroke="#AF52DE" strokeWidth="2" fill="none">
-              <animate attributeName="r" values="4;6;4" dur="0.5s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="32" cy="32" r="5" stroke="#AF52DE" strokeWidth="2" fill="none">
-              <animate attributeName="r" values="4;6;4" dur="0.5s" repeatCount="indefinite" />
-            </circle>
-            <line x1="12" y1="12" x2="28" y2="28" stroke="white" strokeWidth="2" />
-            <line x1="28" y1="12" x2="12" y2="28" stroke="white" strokeWidth="2" />
             <defs>
               <linearGradient id="droneGradient" x1="12" y1="12" x2="28" y2="28">
                 <stop offset="0%" stopColor="#FF5E57" />
@@ -305,15 +242,15 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
           </svg>
         </div>
 
-        {/* Overlay info */}
         <div className="map-overlay">
           <div className="glass-subtle px-3 py-2">
             <small style={{ color: 'var(--text-secondary)' }}>
-              {missionActive ? 'Misión en progreso...' : 'Virtual Planet - Simulación'}
+              {missionActive ? `Objetivo: ${targetZone.toUpperCase()}` : 'Esperando misión...'}
             </small>
           </div>
         </div>
       </div>
+
 
       {/* Level buttons - José Chinchia */}
       <div className="d-flex flex-wrap gap-2 mt-3 justify-content-center">

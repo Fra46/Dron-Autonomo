@@ -7,7 +7,6 @@ import type { TelemetryData } from '@/lib/telemetry'
 interface TelemetryContextType {
   telemetry: TelemetryData
   isConnected: boolean
-  isSimulating: boolean
   connectionError: string | null
   startMission: (targetZone?: string) => void
   stopMission: () => void
@@ -21,8 +20,6 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   console.log('[TelemetryProvider] Inicializando...')
   const telemetryState = useTelemetry({
     wsUrl: typeof window !== 'undefined' ? 'ws://localhost:8765' : '',
-    enableSimulation: true, // Fallback to simulated data when the UDP/WS bridge is unreachable
-    simulationInterval: 1000,
   })
 
   return (

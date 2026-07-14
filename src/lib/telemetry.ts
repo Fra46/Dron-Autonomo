@@ -60,6 +60,7 @@ export interface TelemetryData {
   timestamp: number
   lastSync: number
   coordinates: Coordinates
+  targetPosition: Coordinates
   signal: number
   temperature: number
   speed: number
@@ -101,6 +102,7 @@ export const DEFAULT_TELEMETRY: TelemetryData = {
   timestamp: Date.now(),
   lastSync: Date.now(),
   coordinates: DEFAULT_COORDINATES,
+  targetPosition: DEFAULT_COORDINATES,
   signal: 100,
   temperature: 25,
   speed: 0,
@@ -160,9 +162,9 @@ const normalizeDroneState = (raw: any): DroneState => ({
 })
 
 const normalizeCoordinates = (raw: any): Coordinates => ({
-  latitude: typeof raw?.latitude === 'number' ? raw.latitude : raw?.lat ?? 0,
-  longitude: typeof raw?.longitude === 'number' ? raw.longitude : raw?.lng ?? 0,
-  altitude: typeof raw?.altitude === 'number' ? raw.altitude : 0,
+  latitude: typeof raw?.latitude === 'number' ? raw.latitude : typeof raw?.x === 'number' ? raw.x : raw?.lat ?? 0,
+  longitude: typeof raw?.longitude === 'number' ? raw.longitude : typeof raw?.y === 'number' ? raw.y : raw?.lng ?? 0,
+  altitude: typeof raw?.altitude === 'number' ? raw.altitude : typeof raw?.z === 'number' ? raw.z : 0,
 })
 
 const normalizeLastReading = (raw: any): TelemetryData['lastReading'] => {
@@ -180,8 +182,9 @@ const normalizeNodeReadings = (raw: any): TelemetryNodeReading[] => {
   if (!Array.isArray(raw)) return []
   return raw.map(item => ({
     id: String(item.id ?? item.zone ?? 'unknown'),
-    x: typeof item.x === 'number' ? item.x : item.longitude ?? 0,
-    y: typeof item.y === 'number' ? item.y : item.latitude ?? 0,
+    // Normalize so that x corresponds to latitude-like values and y to longitude-like values
+    x: typeof item.x === 'number' ? item.x : typeof item.latitude === 'number' ? item.latitude : 0,
+    y: typeof item.y === 'number' ? item.y : typeof item.longitude === 'number' ? item.longitude : 0,
     humidity: typeof item.humidity === 'number' ? item.humidity : 0,
   }))
 }
@@ -210,6 +213,7 @@ export const parseTelemetryMessage = (data: string): Partial<TelemetryData> | nu
       const speed = typeof parsed.speed === 'number' ? parsed.speed : DEFAULT_TELEMETRY.speed
       const irrigationStatus = (parsed.irrigationStatus ?? 'idle') as IrrigationStatus
       const nodeReadings = normalizeNodeReadings(parsed.nodeReadings)
+      const targetPosition = parsed.targetPosition ? normalizeCoordinates(parsed.targetPosition) : DEFAULT_COORDINATES
 
       return {
         zones,
@@ -219,6 +223,7 @@ export const parseTelemetryMessage = (data: string): Partial<TelemetryData> | nu
         lastReading,
         history: Array.isArray(parsed.history) ? parsed.history : DEFAULT_TELEMETRY.history,
         coordinates,
+        targetPosition,
         signal: humidity,
         temperature,
         speed,

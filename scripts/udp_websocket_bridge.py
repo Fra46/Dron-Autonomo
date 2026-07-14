@@ -16,6 +16,7 @@ La PWA debe conectarse a ws://localhost:8765 para recibir los datos.
 
 import asyncio
 import json
+import math
 import socket
 import websockets
 from datetime import datetime
@@ -28,6 +29,16 @@ UDP_HOST = "0.0.0.0"
 UDP_PORT = 5005          # Puerto donde llegan los datos del sensor
 WS_HOST  = "localhost"
 WS_PORT  = 8765          # Puerto WebSocket para la PWA
+WEBOTS_HOST = "127.0.0.1"
+WEBOTS_PORT = 5006
+
+# Posiciones simplificadas de las zonas para mostrar movimiento en la PWA
+ZONE_COORDINATES = {
+    "norte": {"x": 50.0, "y": 10.0, "z": 1.0},
+    "centro": {"x": 50.0, "y": 50.0, "z": 1.0},
+    "sur": {"x": 50.0, "y": 85.0, "z": 1.0},
+}
+BASE_POSITION = {"x": 50.0, "y": 95.0, "z": 0.0}
 
 # ── Estado global del sistema ─────────────────────────────────────────────────
 connected_clients: Set[websockets.WebSocketServerProtocol] = set()
@@ -73,6 +84,18 @@ zone_readings = {
 reading_history = []
 drone_state = DroneState()
 
+drone_path = ["sur", "centro", "norte"]
+current_target_index = 0
+
+# Posición inicial del dron en el mapa
+current_drone_position = {
+    "x": BASE_POSITION["x"],
+    "y": BASE_POSITION["y"],
+    "z": BASE_POSITION["z"],
+}
+
+drone_speed = 0.15  # unidades de posición por actualización
+
 # ── Funciones de procesamiento ────────────────────────────────────────────────
 
 def calcular_nivel_humedad(humedad: float) -> str:
@@ -97,6 +120,66 @@ def calcular_zonas_humedad() -> dict:
         nivel = calcular_nivel_humedad(data["humedad"])
         zones[nivel] += 1
     return zones
+
+
+def distance(a: dict, b: dict) -> float:
+    return math.sqrt(
+        (a["x"] - b["x"]) ** 2 +
+        (a["y"] - b["y"]) ** 2 +
+        (a["z"] - b["z"]) ** 2
+    )
+
+
+def move_towards_target(target: dict) -> None:
+    global current_drone_position
+    dx = target["x"] - current_drone_position["x"]
+    dy = target["y"] - current_drone_position["y"]
+    dz = target["z"] - current_drone_position["z"]
+    dist = distance(current_drone_position, target)
+    if dist <= drone_speed or dist == 0:
+        current_drone_position = target.copy()
+        return
+    factor = drone_speed / dist
+    current_drone_position["x"] += dx * factor
+    current_drone_position["y"] += dy * factor
+    current_drone_position["z"] += dz * factor
+
+
+def update_drone_position() -> None:
+    global current_drone_position, drone_state
+
+    if drone_state.flight_status in ["ascenso", "navegando", "regando"]:
+        target_zone = drone_state.target_zone or "centro"
+        target = ZONE_COORDINATES.get(target_zone, ZONE_COORDINATES["centro"])
+        move_towards_target(target)
+        if distance(current_drone_position, target) < 0.2:
+            current_drone_position = target.copy()
+            if drone_state.flight_status == "ascenso":
+                drone_state.flight_status = "navegando"
+
+    elif drone_state.flight_status == "retorno":
+        target = {"x": BASE_POSITION["x"], "y": BASE_POSITION["y"], "z": 1.0}
+        move_towards_target(target)
+        if distance(current_drone_position, target) < 0.2:
+            current_drone_position = target.copy()
+            drone_state.flight_status = "descenso"
+
+    elif drone_state.flight_status == "descenso":
+        if distance(current_drone_position, BASE_POSITION) > 0.2:
+            move_towards_target(BASE_POSITION)
+        else:
+            current_drone_position["z"] = max(0.0, current_drone_position["z"] - 0.05)
+            if current_drone_position["z"] <= 0.05:
+                current_drone_position = BASE_POSITION.copy()
+                drone_state.flight_status = "idle"
+                drone_state.target_zone = None
+
+    else:
+        if distance(current_drone_position, BASE_POSITION) > 0.2:
+            move_towards_target(BASE_POSITION)
+
+    drone_state.position = current_drone_position.copy()
+
 
 def procesar_datos_sensor(datos: dict) -> dict:
     """Procesa datos entrantes del sensor y actualiza estado"""
@@ -166,6 +249,9 @@ def procesar_datos_sensor(datos: dict) -> dict:
             drone_state.target_zone = None
             drone_state.status_timestamp = datetime.now()
 
+    # Actualizar posición del dron hacia su objetivo
+    update_drone_position()
+
     # Construir paquete de telemetria para la PWA
     return {
         "type": "telemetry_update",
@@ -188,6 +274,10 @@ def procesar_datos_sensor(datos: dict) -> dict:
             "targetZone": drone_state.target_zone,
             "waterLevel": drone_state.water_level,
         },
+        "signal": 100,
+        "speed": 0,
+        "temperature": zone_readings[zona]["temperatura"],
+        "targetPosition": ZONE_COORDINATES.get(drone_state.target_zone or "centro", ZONE_COORDINATES["centro"]),
         "lastReading": {
             "zona": zona,
             "humedad": humedad,
@@ -206,6 +296,9 @@ async def udp_receiver():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((UDP_HOST, UDP_PORT))
     sock.setblocking(False)
+
+    # Socket para reenviar datos al controlador de Webots
+    webots_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     
     print(f"[UDP] Escuchando en {UDP_HOST}:{UDP_PORT}")
     
@@ -218,6 +311,9 @@ async def udp_receiver():
             datos = json.loads(mensaje)
             
             print(f"[UDP] Recibido de {addr}: {datos}")
+
+            # Reenviar el mismo paquete al controlador de Webots
+            webots_sock.sendto(data, (WEBOTS_HOST, WEBOTS_PORT))
             
             # Procesar y crear paquete de telemetria
             telemetry_packet = procesar_datos_sensor(datos)

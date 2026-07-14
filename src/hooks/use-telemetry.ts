@@ -4,71 +4,34 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   DEFAULT_TELEMETRY,
   TelemetryData,
-  ZoneState,
-  calculateHumidityLevel,
-  calculateHumidityZones,
   parseTelemetryMessage,
 } from '@/lib/telemetry'
 import {
   createTelemetrySocket,
   TelemetrySocketCommand,
 } from '@/lib/telemetrySocket'
-import { createSimulationUpdate } from '@/lib/telemetrySimulation'
 
 interface UseTelemetryOptions {
   wsUrl?: string
-  enableSimulation?: boolean
-  simulationInterval?: number
 }
 
 export function useTelemetry(options: UseTelemetryOptions = {}) {
   const {
     wsUrl = 'ws://127.0.0.1:8765',
-    enableSimulation = true,
-    simulationInterval = 1000,
   } = options
 
-  console.log('[Telemetry] Hook inicializado con opciones:', { wsUrl, enableSimulation, simulationInterval })
+  console.log('[Telemetry] Hook inicializado con opciones:', { wsUrl })
 
   const [telemetry, setTelemetry] = useState<TelemetryData>(DEFAULT_TELEMETRY)
   const [isConnected, setIsConnected] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
-  const [isSimulating, setIsSimulating] = useState(false)
-  
+
   const socketRef = useRef<ReturnType<typeof createTelemetrySocket> | null>(null)
   const commandQueueRef = useRef<TelemetrySocketCommand[]>([])
-  const simulationRef = useRef<NodeJS.Timeout | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Parse WebSocket message from the bridge
   const parseWSMessage = useCallback((data: string) => parseTelemetryMessage(data), [])
-
-  // Simulation for testing
-  const startSimulation = useCallback(() => {
-    if (simulationRef.current) return
-    
-    setIsSimulating(true)
-    console.log('[Telemetry] Iniciando modo simulacion')
-    
-    const zonas: readonly ['norte', 'centro', 'sur'] = ['norte', 'centro', 'sur']
-    let currentZoneIndex = 0
-    
-    simulationRef.current = setInterval(() => {
-      const currentZone = zonas[currentZoneIndex]
-      currentZoneIndex = (currentZoneIndex + 1) % zonas.length
-      
-      setTelemetry(prev => createSimulationUpdate(prev, zonas))
-    }, simulationInterval)
-  }, [simulationInterval])
-
-  const stopSimulation = useCallback(() => {
-    if (simulationRef.current) {
-      clearInterval(simulationRef.current)
-      simulationRef.current = null
-    }
-    setIsSimulating(false)
-    console.log('[Telemetry] Simulacion detenida')
-  }, [])
 
   // WebSocket connection
   const connect = useCallback(() => {
@@ -78,11 +41,11 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
     console.log('[Telemetry] Intentando conectar a WebSocket:', wsUrl)
     try {
       const socket = createTelemetrySocket(wsUrl, {
-      onOpen: () => {
+        onOpen: () => {
         console.log('[Telemetry] WebSocket conectado exitosamente')
         setIsConnected(true)
         setConnectionError(null)
-        stopSimulation()
+
 
         if (commandQueueRef.current.length > 0) {
           console.log('[Telemetry] Enviando comandos encolados:', commandQueueRef.current)
@@ -115,9 +78,8 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
         }
 
         reconnectTimeoutRef.current = setTimeout(() => {
-          if (enableSimulation) {
-            startSimulation()
-          }
+          console.log('[Telemetry] Reintentando conectar después de cierre')
+          connect()
         }, 2000)
       },
     })
@@ -132,7 +94,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
       console.error('[Telemetry] Error al crear socket:', error)
       setConnectionError('Error al crear conexion')
     }
-  }, [wsUrl, enableSimulation, parseWSMessage, startSimulation, stopSimulation])
+  }, [wsUrl, parseWSMessage])
 
   // Send command to drone
   const sendCommand = useCallback((command: TelemetrySocketCommand) => {
@@ -161,10 +123,11 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
   }, [connect])
 
   const startMission = useCallback((targetZone?: string) => {
-    sendCommand({ type: 'start_mission', target_zone: targetZone ?? 'sur' })
+    const zone = targetZone ?? 'sur'
+    sendCommand({ type: 'start_mission', target_zone: zone })
     setTelemetry(prev => ({
       ...prev,
-      drone: { ...prev.drone, flightStatus: 'ascenso', targetZone: targetZone ?? 'sur' },
+      drone: { ...prev.drone, flightStatus: 'ascenso', targetZone: zone },
     }))
   }, [sendCommand])
 
@@ -186,19 +149,15 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
 
   // Initialize
   useEffect(() => {
-    console.log('[Telemetry] useEffect ejecutado, enableSimulation:', enableSimulation)
-    if (enableSimulation) {
-      startSimulation()
-    }
-    
+    console.log('[Telemetry] useEffect ejecutado')
+
     const connectionDelay = setTimeout(() => {
       console.log('[Telemetry] Llamando a connect()')
       connect()
     }, 500)
-    
+
     return () => {
       clearTimeout(connectionDelay)
-      stopSimulation()
       if (socketRef.current) {
         socketRef.current.close()
       }
@@ -206,12 +165,11 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
         clearTimeout(reconnectTimeoutRef.current)
       }
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [connect])
 
   return {
     telemetry,
     isConnected,
-    isSimulating,
     connectionError,
     startMission,
     stopMission,

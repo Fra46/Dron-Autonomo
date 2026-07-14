@@ -10,6 +10,7 @@ import os
 import glob
 import sys
 import concurrent.futures
+from pathlib import Path
 
 DESTINO_IP     = "127.0.0.1"
 DESTINO_PUERTO = 5005
@@ -23,38 +24,102 @@ USE_MOCK_MODE = False  # Se activará si falla conexión a NASA
 print("🌍 Conectando con NASA SMAP...")
 print()
 
-# EarthAccess usa `EARTHDATA_USERNAME` / `EARTHDATA_PASSWORD` o `EARTHDATA_TOKEN`.
-# Permitimos también alias comunes para facilitar la configuración.
+# EarthAccess usa EARTHDATA_USERNAME / EARTHDATA_PASSWORD o EARTHDATA_TOKEN.
+# Permitimos también alias comunes y un archivo .env para facilitar la configuración.
+def load_dotenv_if_present():
+    candidates = [
+        Path(__file__).resolve().parent / ".env",
+        Path(__file__).resolve().parents[1] / ".env",
+    ]
+
+    for path in candidates:
+        if not path.exists():
+            continue
+
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                for raw_line in handle:
+                    line = raw_line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    if not value:
+                        continue
+
+                    aliases = {
+                        "EARTHDATA_USERNAME": "EARTHDATA_USERNAME",
+                        "EARTHACCESS_USERNAME": "EARTHDATA_USERNAME",
+                        "NASA_USERNAME": "EARTHDATA_USERNAME",
+                        "EARTHDATA_PASSWORD": "EARTHDATA_PASSWORD",
+                        "EARTHACCESS_PASSWORD": "EARTHDATA_PASSWORD",
+                        "NASA_PASSWORD": "EARTHDATA_PASSWORD",
+                        "EARTHDATA_TOKEN": "EARTHDATA_TOKEN",
+                        "EARTHACCESS_TOKEN": "EARTHDATA_TOKEN",
+                        "NASA_TOKEN": "EARTHDATA_TOKEN",
+                    }
+
+                    target = aliases.get(key)
+                    if target:
+                        os.environ.setdefault(target, value)
+        except Exception as exc:
+            print(f"⚠️ No pude leer {path}: {exc}")
+
+
 def sync_earthdata_env_vars():
+    load_dotenv_if_present()
+
     env = os.environ
-    if env.get("EARTHACCESS_USERNAME") and env.get("EARTHACCESS_PASSWORD"):
-        os.environ.setdefault("EARTHDATA_USERNAME", env["EARTHACCESS_USERNAME"])
-        os.environ.setdefault("EARTHDATA_PASSWORD", env["EARTHACCESS_PASSWORD"])
-    if env.get("EARTHACCESS_TOKEN"):
-        os.environ.setdefault("EARTHDATA_TOKEN", env["EARTHACCESS_TOKEN"])
+    aliases = {
+        "EARTHACCESS_USERNAME": "EARTHDATA_USERNAME",
+        "NASA_USERNAME": "EARTHDATA_USERNAME",
+        "EARTHACCESS_PASSWORD": "EARTHDATA_PASSWORD",
+        "NASA_PASSWORD": "EARTHDATA_PASSWORD",
+        "EARTHACCESS_TOKEN": "EARTHDATA_TOKEN",
+        "NASA_TOKEN": "EARTHDATA_TOKEN",
+    }
+
+    for alias, target in aliases.items():
+        if env.get(alias):
+            os.environ.setdefault(target, env[alias])
+
+
+def has_nasa_credentials():
+    return bool(os.environ.get("EARTHDATA_USERNAME") and os.environ.get("EARTHDATA_PASSWORD")) or bool(os.environ.get("EARTHDATA_TOKEN"))
+
 
 sync_earthdata_env_vars()
 
+if has_nasa_credentials():
+    print("✅ Credenciales de NASA detectadas. Intentando autenticación...")
+else:
+    print("⚠️ No se encontraron credenciales de NASA. Se buscará un archivo .env o se usará modo simulación.")
+
 try:
-    # Intenta login con credenciales de entorno o archivo .netrc
-    auth = earthaccess.login(strategy="environment")
+    auth = None
+    strategies = []
+
+    if has_nasa_credentials():
+        strategies.append("environment")
+
+    strategies.extend(["netrc", "interactive"])
+
+    for strategy in strategies:
+        try:
+            print(f"🔐 Intentando autenticación con estrategia: {strategy}")
+            auth = earthaccess.login(strategy=strategy)
+            if auth:
+                break
+        except Exception as exc:
+            print(f"⚠️ Estrategia {strategy} falló: {exc}")
+            auth = None
+
     if not auth:
-        print("⚠️ Variables de entorno no configuradas. Intentando interactivo...")
-
-        def interactive_login():
-            return earthaccess.login(strategy="interactive")
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(interactive_login)
-            try:
-                auth = future.result(timeout=30)
-            except concurrent.futures.TimeoutError:
-                raise TimeoutError("Timeout en autenticación interactiva (30s)")
-
-    if auth:
-        print("✅ Conexión exitosa con NASA\n")
-    else:
         raise RuntimeError("No se pudo autenticar con NASA")
+
+    print("✅ Conexión exitosa con NASA\n")
 
 except (TimeoutError, EOFError, KeyboardInterrupt, RuntimeError) as e:
     print(f"\n❌ Error de autenticación NASA: {e}")
