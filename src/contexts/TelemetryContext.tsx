@@ -21,7 +21,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   console.log('[TelemetryProvider] Inicializando...')
   const telemetryState = useTelemetry({
     wsUrl: typeof window !== 'undefined' ? 'ws://localhost:8765' : '',
-    enableSimulation: false, // Temporarily disable simulation
+    enableSimulation: true, // Fallback to simulated data when the UDP/WS bridge is unreachable
     simulationInterval: 1000,
   })
 

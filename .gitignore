@@ -14,3 +14,14 @@ next.user-config.*
 node_modules
 .next/
 .DS_Store
+dist/
+
+# Build output (Vite)
+*.local
+
+# Python
+__pycache__/
+*.pyc
+
+# Downloaded NASA SMAP data (fetched on demand by scripts/sensor_nasa.py)
+scripts/*.h5

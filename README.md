@@ -75,7 +75,7 @@ Sistema completo de riego agrícola autónomo que combina un dron Crazyflie con 
 
 ### Prerrequisitos
 
-- **Node.js** 18+ y **pnpm**
+- **Node.js** 18+ y **npm** (o pnpm/yarn si prefieren, pero el lockfile commiteado es de npm)
 - **Python** 3.8+ con pip
 - **Webots** (opcional, para simulación completa)
 
@@ -90,10 +90,10 @@ cd agrodron-autonomo
 
 ```bash
 # Instalar dependencias de Node.js
-pnpm install
+npm install
 
 # Iniciar servidor de desarrollo
-pnpm dev
+npm run dev
 ```
 
 La PWA estará disponible en `http://localhost:3000`
@@ -110,25 +110,16 @@ pip install earthaccess h5py numpy
 
 ### 📖 Configuración de Credenciales NASA (Importante ⭐)
 
-Si quieres usar **datos reales del satélite SMAP de NASA**, consulta:
-- **[NASA_CREDENTIALS.md](./scripts/NASA_CREDENTIALS.md)** — Guía paso a paso para autenticación
-
-Para EarthAccess usa estas variables:
+Si quieres usar **datos reales del satélite SMAP de NASA**, `scripts/sensor_nasa.py` se autentica via EarthAccess con estas variables de entorno:
 - `EARTHDATA_USERNAME`
 - `EARTHDATA_PASSWORD`
 - o `EARTHDATA_TOKEN`
 
 El script también acepta los alias `EARTHACCESS_USERNAME`, `EARTHACCESS_PASSWORD` y `EARTHACCESS_TOKEN`.
 
-Si no configuras credenciales, el sistema fallback automáticamente a modo simulación.
+Si no configuras credenciales, el sistema cae automáticamente a modo simulación.
 
-### ✨ Mejoras Recientes
-
-Revisa **[MEJORAS_SISTEMA_SENSORES.md](./scripts/MEJORAS_SISTEMA_SENSORES.md)** para:
-- Solución a problemas de congelación en sensor NASA
-- Fallback automático a datos simulados
-- Mejor logging y debugging
-- Troubleshooting completo
+> ⚠️ Nota de mantenimiento: esta sección enlazaba antes a `scripts/NASA_CREDENTIALS.md` y `scripts/MEJORAS_SISTEMA_SENSORES.md`, pero ninguno de los dos archivos existe en el repo. Si alguien del equipo los tiene localmente, súbanlos a `docs/` — mientras tanto se quitaron los enlaces rotos.
 
 ### 4. Configurar Webots (Opcional)
 
@@ -159,7 +150,7 @@ python sensor_nasa.py
 **Terminal 3 — PWA Frontend:**
 ```bash
 # En la raíz del proyecto
-pnpm dev
+npm run dev
 # Abrir: http://localhost:3000
 ```
 
@@ -174,38 +165,36 @@ pnpm dev
 
 ✅ **Nota:** Si `sensor_nasa.py` no tiene credenciales, **automáticamente cambia a datos simulados.**
 
-### Modos de Operación (Anterior - Para Referencia)
-
 ## 📁 Estructura del Proyecto
 
 ```
 agrodron-autonomo/
-├── 📁 app/                    # Next.js App Router
-│   ├── globals.css           # Estilos globales
-│   ├── layout.tsx            # Layout principal
-│   └── page.tsx              # Página principal
-├── 📁 components/            # Componentes React
-│   ├── ui/                   # Componentes UI reutilizables
-│   ├── drone/                # Componentes específicos del dron
-│   └── theme-provider.tsx    # Proveedor de tema
-├── 📁 contexts/              # Contextos React
-│   └── TelemetryContext.tsx  # Contexto de telemetría
-├── 📁 hooks/                 # Hooks personalizados
-├── 📁 lib/                   # Utilidades y configuraciones
-├── 📁 public/                # Archivos estáticos
-│   ├── manifest.json         # Configuración PWA
-│   └── icons/                # Iconos de la app
-├── 📁 scripts/               # Scripts Python
-│   ├── sensor_mock.py        # Simulador de sensores
-│   ├── sensor_nasa.py        # Datos NASA SMAP
-│   ├── udp_websocket_bridge.py # Puente de comunicación
-│   ├── crazyflie_controller.py # Controlador del dron
-│   └── README_TELEMETRY.md   # Documentación detallada
-├── 📁 styles/                # Estilos adicionales
-├── package.json              # Dependencias Node.js
-├── vite.config.ts           # Configuración Vite
-├── tsconfig.json            # Configuración TypeScript
-└── README.md                # Este archivo
+├── 📁 src/
+│   ├── main.tsx               # Entry point (Vite)
+│   ├── App.tsx                # Componente raíz
+│   ├── components/            # Componentes React (TelemetryBar, MapContainer, ScorePanel, BigScoreSummary, MissionControl)
+│   ├── contexts/
+│   │   └── TelemetryContext.tsx
+│   ├── hooks/
+│   │   └── use-telemetry.ts
+│   ├── lib/                   # telemetry.ts, telemetrySocket.ts, telemetrySimulation.ts, commands.ts, uiUtils.ts
+│   └── styles/
+│       └── globals.css
+├── 📁 public/                 # Archivos estáticos e íconos PWA
+│   └── manifest.json
+├── 📁 scripts/                 # Scripts Python (backend/simulación)
+│   ├── sensor_mock.py
+│   ├── sensor_nasa.py
+│   ├── udp_websocket_bridge.py
+│   ├── crazyflie_controller.py
+│   └── measure_bridge_latency.py   # Mide latencia real UDP → WebSocket
+├── 📁 docs/
+│   └── TELEMETRY.md           # Documentación detallada del protocolo de telemetría
+├── index.html
+├── package.json
+├── vite.config.ts
+├── tsconfig.json
+└── README.md
 ```
 
 ## 🎮 Scripts Disponibles
@@ -218,14 +207,15 @@ agrodron-autonomo/
 | `sensor_nasa.py` | `python sensor_nasa.py` | Descarga datos reales NASA SMAP |
 | `udp_websocket_bridge.py` | `python udp_websocket_bridge.py` | Puente UDP ↔ WebSocket |
 | `crazyflie_controller.py` | `python crazyflie_controller.py` | Controlador del dron Webots |
+| `measure_bridge_latency.py` | `python measure_bridge_latency.py --samples 300` | Mide la latencia real extremo a extremo UDP → WebSocket (requiere el bridge corriendo) |
 
 ### Scripts NPM
 
 | Comando | Descripción |
 |---------|-------------|
-| `pnpm dev` | Inicia servidor de desarrollo |
-| `pnpm build` | Construye para producción |
-| `pnpm preview` | Vista previa de producción |
+| `npm run dev` | Inicia servidor de desarrollo |
+| `npm run build` | Construye para producción |
+| `npm run preview` | Vista previa de producción |
 
 ## 🔧 Configuración
 

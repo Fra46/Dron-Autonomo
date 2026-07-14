@@ -1,48 +1,14 @@
-import { TelemetryData, ZoneState, calculateHumidityLevel } from './telemetry'
+import { TelemetryData, ZoneState, calculateHumidityLevel, calculateHumidityZones } from './telemetry'
 
 export interface SimulationOptions {
   interval: number
   zones: readonly ['norte', 'centro', 'sur']
 }
 
-export class TelemetrySimulator {
-  private intervalId: NodeJS.Timeout | null = null
-  private currentZoneIndex = 0
-  private options: SimulationOptions
-
-  constructor(options: SimulationOptions) {
-    this.options = options
-  }
-
-  start(onUpdate: (newTelemetry: TelemetryData) => void): void {
-    if (this.intervalId) return
-
-    console.log('[TelemetrySimulator] Iniciando simulacion')
-
-    this.intervalId = setInterval(() => {
-      const currentZone = this.options.zones[this.currentZoneIndex]
-      this.currentZoneIndex = (this.currentZoneIndex + 1) % this.options.zones.length
-
-      onUpdate(this.generateTelemetryUpdate(currentZone))
-    }, this.options.interval)
-  }
-
-  stop(): void {
-    if (this.intervalId) {
-      clearInterval(this.intervalId)
-      this.intervalId = null
-      console.log('[TelemetrySimulator] Simulacion detenida')
-    }
-  }
-
-  private generateTelemetryUpdate(currentZone: string): TelemetryData {
-    // This would be called with previous telemetry, but for simplicity, generate full state
-    // In real implementation, pass previous state
-    throw new Error('Implement with previous state')
-  }
-}
-
-// Factory function for simulation updates
+// Factory function for simulation updates.
+// Used by hooks/use-telemetry.ts as a graceful fallback when the UDP/WebSocket
+// bridge (udp_websocket_bridge.py) is unreachable, so the UI keeps moving
+// instead of freezing on stale data.
 export function createSimulationUpdate(prev: TelemetryData, zones: readonly ['norte', 'centro', 'sur']): TelemetryData {
   const currentZone = zones[Math.floor(Math.random() * zones.length)]
 
@@ -90,7 +56,7 @@ export function createSimulationUpdate(prev: TelemetryData, zones: readonly ['no
   const newReading = {
     zona: currentZone,
     humedad: newHumedad,
-    estado,
+    estado: estado as ZoneState,
     temperatura: newZones[currentZone].temperatura,
     timestamp: new Date().toISOString(),
   }
@@ -98,7 +64,7 @@ export function createSimulationUpdate(prev: TelemetryData, zones: readonly ['no
   return {
     ...prev,
     zones: newZones,
-    humidityZones: prev.humidityZones, // Assume calculateHumidityZones is called elsewhere
+    humidityZones: calculateHumidityZones(newZones),
     averageHumidity: avgHumidity,
     drone: {
       ...prev.drone,

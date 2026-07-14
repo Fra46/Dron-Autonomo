@@ -13,6 +13,7 @@ import {
   createTelemetrySocket,
   TelemetrySocketCommand,
 } from '@/lib/telemetrySocket'
+import { createSimulationUpdate } from '@/lib/telemetrySimulation'
 
 interface UseTelemetryOptions {
   wsUrl?: string
@@ -85,7 +86,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
 
         if (commandQueueRef.current.length > 0) {
           console.log('[Telemetry] Enviando comandos encolados:', commandQueueRef.current)
-          commandQueueRef.current.forEach(command => socket.sendCommand(command))
+          commandQueueRef.current.forEach(command => socketRef.current?.sendCommand(command))
           commandQueueRef.current = []
         }
       },
