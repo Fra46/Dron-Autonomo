@@ -36,7 +36,11 @@ async def run_measurement(host: str, udp_port: int, ws_url: str, samples: int, i
         async with websockets.connect(ws_url) as ws:
             print(f"[WS] Conectado a {ws_url}")
             while len(received) < samples:
-                message = await ws.recv()
+                try:
+                    message = await asyncio.wait_for(ws.recv(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    print(f"[WS] Sin nuevas muestras en 2s (recibidas {len(received)}/{samples}); cerrando.")
+                    break
                 data = json.loads(message)
                 if data.get("type") != "telemetry_update":
                     continue

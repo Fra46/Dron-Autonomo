@@ -13,15 +13,26 @@ ESTADOS DEL SISTEMA:
 """
 
 from controller import Robot   # API de Webots para controlar el robot simulado
-import socket                  # Para recibir datos UDP del sensor NASA
-import json                    # Para parsear los paquetes JSON que llegan por UDP
+import socket                  # Para recibir datos UDP del bridge y enviar telemetria
+import json                    # Para parsear/serializar los paquetes JSON
 import math                    # Para operaciones trigonométricas (cos, sin, sqrt)
+import time                    # Para muestrear velocidad de envio de telemetria
 
 # ── 1. CONFIGURACIÓN DE RED ──────────────────────────────────────────────────
-# El controlador escucha en TODAS las interfaces de red ("0.0.0.0")
-# en el puerto 5005, esperando paquetes JSON del sensor_nasa.py
+# El controlador escucha en el puerto que el bridge usa para reenviar lecturas
+# de suelo y comandos de mision (ver CONTROLLER_CMD_PORT en
+# scripts/udp_websocket_bridge.py). NO debe coincidir con el puerto 5005 donde
+# el propio bridge escucha, o ambos procesos no podrían bindear ese puerto
+# al mismo tiempo en la misma máquina.
 UDP_IP   = "0.0.0.0"
-UDP_PORT = 5005
+UDP_PORT = 5006
+
+# Socket de salida: aquí el controlador envía su telemetría real (posición,
+# batería estimada, estado de la máquina de estados) de vuelta al bridge,
+# que la fusiona con las lecturas de suelo y la retransmite a la PWA.
+BRIDGE_HOST = "127.0.0.1"
+BRIDGE_TELEMETRY_PORT = 5005
+TELEMETRY_INTERVAL_S = 1.0   # ~1 Hz, igual que el resto del pipeline (paper: "1 Hz nominal")
 
 # ── 2. PARÁMETROS DE VUELO ───────────────────────────────────────────────────
 ALTURA_OBJETIVO = 1.0    # Altura de crucero en metros (el dron vuela a esta altura)
@@ -66,41 +77,40 @@ KD_Z       = 5.0    # Amortigua las oscilaciones verticales
 THRUST_BASE = 48.0
 
 # ── 4. LÓGICA DIFUSA ─────────────────────────────────────────────────────────
-# La lógica difusa permite tomar decisiones graduales en lugar de
-# simples umbrales on/off. Se evalúa cuánto "pertenece" un valor
-# a las categorías "muy seco" y "seco".
+# Implementa exactamente las ecuaciones (1)-(3) del paper "AgroDrone:
+# Autonomous Precision Irrigation Platform" (20CCC 2026):
+#   mu_dry(h)      = 1          si h <= 30
+#                  = (50-h)/20  si 30 < h < 50
+#                  = 0          si h >= 50
+#   mu_very_dry(h) = 1          si h <= 20
+#                  = (35-h)/15  si 20 < h < 35
+#                  = 0          si h >= 35
+#   activa riego si mu_dry(h) + mu_very_dry(h) > theta, theta = 0.65
+# (theta calibrado empiricamente en el paper, seccion 2.3)
 
-def mu_muy_seco(h):
-    """
-    Función de membresía difusa para 'suelo MUY SECO'.
-    Retorna 1.0 (certeza total) si humedad <= 15%.
-    Retorna 0.0 si humedad >= 30%.
-    Entre 15% y 30% disminuye linealmente.
-    """
-    if h <= 15:
+UMBRAL_ACTIVACION = 0.65  # theta, calibrado en el paper (Tabla 2)
+
+def mu_dry(h):
+    """Funcion de membresia difusa para 'suelo SECO' (ecuacion 1 del paper)."""
+    if h <= 30:
         return 1.0
-    return max(0.0, (30 - h) / 15.0)
+    if h >= 50:
+        return 0.0
+    return (50 - h) / 20.0
 
-def mu_seco(h):
-    """
-    Función de membresía difusa para 'suelo SECO'.
-    Tiene forma triangular: sube de 20% a 35%, baja de 35% a 50%.
-    El pico (1.0) está en 35% de humedad.
-    """
-    if 20 < h <= 35:
-        return (h - 20) / 15.0
-    if 35 < h <= 50:
-        return (50 - h) / 15.0
-    return 0.0
+def mu_very_dry(h):
+    """Funcion de membresia difusa para 'suelo MUY SECO' (ecuacion 2 del paper)."""
+    if h <= 20:
+        return 1.0
+    if h >= 35:
+        return 0.0
+    return (35 - h) / 15.0
 
 def requiere_riego(humedad: float) -> bool:
+    """Decide si una zona necesita riego usando logica difusa (ecuacion 3
+    del paper): activa la mision si mu_dry(h) + mu_very_dry(h) > theta.
     """
-    Decide si una zona necesita riego usando lógica difusa.
-    Suma los grados de pertenencia a 'muy_seco' y 'seco'.
-    Si la suma supera 0.5 → se activa el riego.
-    Esto evita activar el dron por lecturas ruidosas o valores límite.
-    """
-    return (mu_muy_seco(humedad) + mu_seco(humedad)) > 0.5
+    return (mu_dry(humedad) + mu_very_dry(humedad)) > UMBRAL_ACTIVACION
 
 # ── 5. ESTADO DEL PID ────────────────────────────────────────────────────────
 # El controlador PID necesita recordar valores del paso anterior
@@ -308,11 +318,17 @@ gps.enable(timestep)
 gyro = robot.getDevice("gyro")            # Mide velocidades angulares (rad/s)
 gyro.enable(timestep)
 
-# Crear socket UDP no bloqueante para recibir datos del sensor_nasa.py
+# Crear socket UDP no bloqueante para recibir datos del bridge (lecturas de
+# suelo reenviadas + comandos de mision de la PWA)
 # setblocking(False) permite que el bucle principal no se congele esperando datos
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
 sock.setblocking(False)
+
+# Socket de salida para enviar telemetria real del dron de vuelta al bridge
+telemetry_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+telemetry_sock.setblocking(False)
+last_telemetry_sent = 0.0
 
 # ── 8. ESPERA DE INICIALIZACIÓN (igual que crazyflie.c) ──────────────────────
 # El firmware original espera 2 segundos antes de comenzar a volar
@@ -341,8 +357,73 @@ DESCENSO  = "DESCENSO"   # Bajando controladamente hasta tocar tierra
 # Variables de estado inicial
 estado         = IDLE              # El dron comienza en tierra
 objetivo_xy    = [0.0, 0.0]       # Coordenadas del destino actual
+objetivo_zona  = None               # Nombre de zona objetivo actual (para telemetria)
 timer_riego    = 0.0               # Contador de tiempo de riego acumulado
 height_desired = ALTURA_OBJETIVO   # Altura objetivo dinámica (cambia en descenso)
+
+# Estimaciones simples reportadas como telemetria (no hay sensores reales de
+# bateria/nivel de agua en la simulacion de Webots, se estiman por tiempo de
+# vuelo/riego transcurrido; se documentan aqui para que sea explicito que son
+# estimaciones, no lecturas de hardware).
+bateria_estimada    = 100.0
+nivel_agua_estimado = 100.0
+
+# Mapeo de estados internos (mayusculas) al formato que espera la PWA
+# (ver FlightStatus en src/lib/telemetry.ts)
+ESTADO_A_FRONTEND = {
+    IDLE: "idle",
+    ASCENSO: "ascenso",
+    NAVEGANDO: "navegando",
+    REGANDO: "regando",
+    RETORNO: "retorno",
+    DESCENSO: "descenso",
+}
+
+
+def proyectar_a_porcentaje(x_m: float, y_m: float):
+    """Proyecta una posicion real de Webots (metros) al espacio porcentual
+    0-100 que usa el mapa de la PWA (ver ZONE_LAYOUT en
+    src/components/MapContainer.tsx). Las tres zonas estan alineadas sobre la
+    diagonal x=y en COORDENADAS_ZONAS (sur=[-1.5,-1.5], centro=[0,0],
+    norte=[1.5,1.5]), asi que se parametriza esa diagonal con t en [0,1]
+    (0=sur, 1=norte) y se mapea a y_pct en [80, 20], igual que ZONE_LAYOUT.
+    """
+    t = (x_m + 1.5) / 3.0
+    t = max(0.0, min(1.0, t))
+    y_pct = 80.0 - 60.0 * t
+    return {"x": 50.0, "y": y_pct, "z": 0.0}
+
+
+def enviar_telemetria(x_global, y_global, actual_altitude, speed_mps):
+    """Construye y envia un paquete de telemetria real del dron hacia el
+    bridge (ver procesar_telemetria_dron en udp_websocket_bridge.py)."""
+    global bateria_estimada, nivel_agua_estimado
+
+    if estado != IDLE:
+        bateria_estimada = max(0.0, bateria_estimada - 0.02)
+    if estado == REGANDO:
+        nivel_agua_estimado = max(0.0, nivel_agua_estimado - 0.5)
+
+    target_pct = proyectar_a_porcentaje(*objetivo_xy) if objetivo_zona else None
+
+    paquete = {
+        "type": "drone_telemetry",
+        "flightStatus": ESTADO_A_FRONTEND.get(estado, "idle"),
+        "battery": round(bateria_estimada, 1),
+        "waterLevel": round(nivel_agua_estimado, 1),
+        "speed": round(speed_mps, 3),
+        "targetZone": objetivo_zona,
+        "position": proyectar_a_porcentaje(x_global, y_global),
+    }
+    if target_pct is not None:
+        paquete["targetPosition"] = target_pct
+
+    try:
+        telemetry_sock.sendto(json.dumps(paquete).encode("utf-8"), (BRIDGE_HOST, BRIDGE_TELEMETRY_PORT))
+    except Exception as exc:
+        print(f"  No se pudo enviar telemetria al bridge: {exc}")
+
+
 
 # Leer posición inicial del GPS para calcular velocidades en el primer paso
 past_x_global = gps.getValues()[0]
@@ -359,34 +440,61 @@ while robot.step(timestep) != -1:
     if dt <= 0:
         dt = dt_step   # Protección contra división por cero en el primer paso
 
-    # ── A. RECIBIR DATOS UDP DEL SENSOR NASA ─────────────────────────────────
+    # ── A. RECIBIR DATOS UDP (lecturas de suelo reenviadas + comandos de mision) ──
     # Intenta leer un paquete UDP. Si no hay datos, continúa sin bloquearse
     # (gracias a setblocking(False) → lanza BlockingIOError si no hay datos)
     try:
         data, _ = sock.recvfrom(4096)
         datos   = json.loads(data.decode("utf-8"))
-        humedad = float(datos["humedad"])          # Porcentaje de humedad del suelo
-        zona    = datos.get("zona", "centro")      # Norte, centro o sur
+        tipo    = datos.get("type")
 
-        print(f"  UDP recibido → Zona: {zona.upper()} | "
-              f"Humedad: {humedad:.1f}% | Estado actual: {estado}")
-
-        # Reaccionar al paquete según el estado actual del dron
-        if estado == IDLE:
-            # Si está en tierra y la humedad es crítica → despegar hacia esa zona
-            if requiere_riego(humedad):
+        if tipo == "start_mission":
+            # Comando explícito de la PWA: fuerza el despegue hacia la zona
+            # indicada, sin esperar a que la lógica difusa lo active.
+            zona = datos.get("target_zone", "sur")
+            if estado == IDLE:
+                objetivo_zona  = zona
                 objetivo_xy    = COORDENADAS_ZONAS.get(zona, [0.0, 0.0])
                 height_desired = ALTURA_OBJETIVO
                 estado         = ASCENSO
-                print(f"  Riego requerido en {zona.upper()}. "
-                      f"Iniciando ASCENSO → objetivo {objetivo_xy}")
+                print(f"  [PWA] start_mission → zona {zona.upper()}. Iniciando ASCENSO.")
 
-        elif estado == REGANDO:
-            # Si ya está regando y la humedad se normalizó → volver a casa
-            if not requiere_riego(humedad):
-                print(f"  Zona {zona.upper()} ya no requiere riego. Iniciando RETORNO.")
+        elif tipo == "stop_mission":
+            if estado in (ASCENSO, NAVEGANDO, REGANDO):
+                print("  [PWA] stop_mission → iniciando RETORNO.")
                 objetivo_xy = [0.0, 0.0]
                 estado      = RETORNO
+
+        elif tipo == "emergency_stop":
+            if estado != IDLE:
+                print("  [PWA] emergency_stop → DESCENSO inmediato.")
+                estado = DESCENSO
+
+        elif "zona" in datos and "humedad" in datos:
+            # Lectura de suelo reenviada por el bridge (sensor_nasa.py / sensor_mock.py)
+            humedad = float(datos["humedad"])
+            zona    = datos.get("zona", "centro")
+
+            print(f"  UDP recibido → Zona: {zona.upper()} | "
+                  f"Humedad: {humedad:.1f}% | Estado actual: {estado}")
+
+            # Reaccionar al paquete según el estado actual del dron
+            if estado == IDLE:
+                # Si está en tierra y la humedad es crítica → despegar hacia esa zona
+                if requiere_riego(humedad):
+                    objetivo_zona  = zona
+                    objetivo_xy    = COORDENADAS_ZONAS.get(zona, [0.0, 0.0])
+                    height_desired = ALTURA_OBJETIVO
+                    estado         = ASCENSO
+                    print(f"  Riego requerido en {zona.upper()}. "
+                          f"Iniciando ASCENSO → objetivo {objetivo_xy}")
+
+            elif estado == REGANDO:
+                # Si ya está regando y la humedad se normalizó → volver a casa
+                if not requiere_riego(humedad):
+                    print(f"  Zona {zona.upper()} ya no requiere riego. Iniciando RETORNO.")
+                    objetivo_xy = [0.0, 0.0]
+                    estado      = RETORNO
 
     except BlockingIOError:
         # No hay paquete UDP disponible en este paso → continuar normalmente
@@ -394,6 +502,7 @@ while robot.step(timestep) != -1:
     except (json.JSONDecodeError, KeyError, ValueError) as e:
         # El paquete llegó corrupto o con formato incorrecto → ignorar y seguir
         print(f"  Paquete UDP malformado: {e}")
+
 
     # ── B. LEER SENSORES ─────────────────────────────────────────────────────
     # Obtener orientación actual del dron desde el IMU
@@ -505,6 +614,7 @@ while robot.step(timestep) != -1:
                 print("  Dron aterrizado. Volviendo a IDLE")
                 apagar_motores()
                 estado = IDLE
+                objetivo_zona = None
                 # Actualizar referencias para el próximo ciclo
                 past_time     = current_time
                 past_x_global = x_global
@@ -537,3 +647,23 @@ while robot.step(timestep) != -1:
     past_time     = current_time
     past_x_global = x_global
     past_y_global = y_global
+
+    # ── E. TELEMETRIA REAL HACIA EL BRIDGE (~1 Hz) ───────────────────────────
+    # Reporta posicion/altura/bateria/estado reales de esta simulacion Webots;
+    # la PWA los recibe fusionados con las lecturas de suelo (ver
+    # udp_websocket_bridge.py). No se envia en cada paso de simulacion (que
+    # corre a decenas de Hz) para no saturar el enlace; se limita a ~1 Hz,
+    # igual que el resto del pipeline.
+    if current_time - last_telemetry_sent >= TELEMETRY_INTERVAL_S:
+        speed_mps = math.sqrt(vx_global ** 2 + vy_global ** 2)
+        enviar_telemetria(x_global, y_global, actual_altitude, speed_mps)
+        last_telemetry_sent = current_time
+
+
+    # ── E. ENVIAR TELEMETRIA REAL AL BRIDGE ──────────────────────────────────
+    # Se limita a ~1 Hz (TELEMETRY_INTERVAL_S) para no saturar el enlace y
+    # mantener la misma cadencia nominal que el resto del pipeline (paper: "1 Hz nominal").
+    if current_time - last_telemetry_sent >= TELEMETRY_INTERVAL_S:
+        velocidad_suelo = math.sqrt(vx_global ** 2 + vy_global ** 2)
+        enviar_telemetria(x_global, y_global, actual_altitude, velocidad_suelo)
+        last_telemetry_sent = current_time

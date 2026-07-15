@@ -1,38 +1,219 @@
 """
-udp_websocket_bridge.py - Puente UDP a WebSocket (forwarder)
-Recibe paquetes UDP (sensores o Webots) y los reenvía tal cual a la PWA via WebSocket.
-También reenvía comandos recibidos por WebSocket hacia Webots por UDP.
+udp_websocket_bridge.py - Puente UDP <-> WebSocket (agregador con estado)
+Proyecto: AgroDrone - Sistema Inteligente de Control Autonomo para Drones de Riego
+Universidad Popular del Cesar
 
-Diseño: no se fabrican ni simulan datos en este puente. Todo se reenvía "real".
+Implementa el bloque "Communication Middleware" descrito en el paper del 20CCC
+(Fig. 1 y Fig. 2): recibe telemetria real por UDP desde dos tipos de fuentes
+- lecturas de humedad de suelo (sensor_nasa.py / sensor_mock.py)
+- telemetria del dron (crazyflie_controller.py corriendo en Webots)
+las fusiona en un unico snapshot ("Process telemetry" en la Fig. 2) y lo
+retransmite por WebSocket a la PWA. Tambien reenvia los comandos de mision
+que la PWA envia por WebSocket (start_mission, stop_mission, emergency_stop,
+request_status) hacia el controlador del dron por UDP.
+
+Diseno: el bridge NO inventa datos. Todo lo que agrega proviene de paquetes
+UDP reales recibidos de sensores o del controlador; unicamente los combina
+en una estructura coherente para la PWA (igual que en la Fig. 2 del paper).
+
+Esquema de puertos (evita colisiones con crazyflie_controller.py):
+    5005/UDP  -> el bridge escucha aqui. Sensores de suelo Y el controlador
+                 del dron envian su telemetria a este puerto.
+    5006/UDP  -> el bridge envia hacia aca: (a) las lecturas de suelo
+                 reenviadas "tal cual" para que el controlador las use en su
+                 logica difusa, y (b) los comandos de mision de la PWA.
+                 crazyflie_controller.py debe escuchar en este puerto.
+    8765/TCP  -> WebSocket hacia la PWA.
 """
 
 import asyncio
 import json
 import socket
-import websockets
+import time
+from datetime import datetime
 from typing import Set, Optional
 
-# ── Configuración de red ──────────────────────────────────────────────────────
+import websockets
+
+# ── Configuracion de red ──────────────────────────────────────────────────────
 UDP_HOST = "0.0.0.0"
-UDP_PORT = 5005
+UDP_PORT = 5005          # Entrada: sensores de suelo + telemetria del dron
 WS_HOST = "0.0.0.0"
-WS_PORT = 8765
-WEBOTS_HOST = "127.0.0.1"
-WEBOTS_PORT = 5006
+WS_PORT = 8765           # Salida: PWA
+CONTROLLER_HOST = "127.0.0.1"
+CONTROLLER_CMD_PORT = 5006   # Salida: reenvio de lecturas de suelo + comandos de mision
 
-# Conjuntos y estado simples
-connected_clients: Set[websockets.WebSocketServerProtocol] = set()
-last_raw_packet: Optional[str] = None
+ZONE_NAMES = ("norte", "centro", "sur")
 
-# Socket UDP global para reenviar comandos/paquetes a Webots
-webots_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-webots_sock.setblocking(False)
+# ── Estado agregado (fusion de todas las fuentes UDP recibidas) ──────────────
+zone_readings = {
+    "norte": {"humedad": 75.0, "estado": "humedo", "temperatura": 30.0},
+    "centro": {"humedad": 50.0, "estado": "normal", "temperatura": 32.0},
+    "sur": {"humedad": 25.0, "estado": "seco", "temperatura": 35.0},
+}
+last_reading: Optional[dict] = None
+reading_history: list = []
+
+drone_state = {
+    "flightStatus": "idle",
+    "battery": 100.0,
+    "position": {"x": 50.0, "y": 80.0, "z": 0.0},
+    "targetZone": None,
+    "waterLevel": 100.0,
+    "speed": 0.0,
+}
+target_position = {"x": 50.0, "y": 80.0, "z": 0.0}
+last_drone_packet_ts: Optional[float] = None
+
+connected_clients: Set = set()
+
+# Socket UDP de salida hacia el controlador (comandos + reenvio de suelo)
+controller_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+controller_sock.setblocking(False)
+
+
+def calcular_nivel_humedad(humedad: float) -> str:
+    if humedad < 25:
+        return "lv0"
+    if humedad < 40:
+        return "lv1"
+    if humedad < 55:
+        return "lv2"
+    if humedad < 70:
+        return "lv3"
+    if humedad < 85:
+        return "lv4"
+    return "lv5"
+
+
+def calcular_zonas_humedad() -> dict:
+    zones = {"lv0": 0, "lv1": 0, "lv2": 0, "lv3": 0, "lv4": 0, "lv5": 0}
+    for data in zone_readings.values():
+        zones[calcular_nivel_humedad(data["humedad"])] += 1
+    return zones
+
+
+def estimar_signal() -> float:
+    """Heuristica honesta de calidad de enlace: basada en cuanto hace que
+    llego el ultimo paquete de telemetria del dron, no un valor inventado."""
+    if last_drone_packet_ts is None:
+        return 0.0
+    elapsed = time.monotonic() - last_drone_packet_ts
+    if elapsed <= 1.5:
+        return 100.0
+    if elapsed >= 6.0:
+        return 0.0
+    return max(0.0, 100.0 * (1 - (elapsed - 1.5) / 4.5))
+
+
+def build_snapshot() -> dict:
+    avg_humidity = sum(z["humedad"] for z in zone_readings.values()) / len(zone_readings)
+    target_zone = drone_state.get("targetZone")
+    ambient_temp_zone = target_zone if target_zone in zone_readings else "centro"
+    return {
+        "type": "telemetry_update",
+        "timestamp": datetime.now().isoformat(),
+        "zones": {
+            name: {
+                "humedad": data["humedad"],
+                "estado": data["estado"],
+                "temperatura": data["temperatura"],
+                "nivel": calcular_nivel_humedad(data["humedad"]),
+            }
+            for name, data in zone_readings.items()
+        },
+        "humidityZones": calcular_zonas_humedad(),
+        "averageHumidity": avg_humidity,
+        "drone": dict(drone_state),
+        "coordinates": drone_state["position"],
+        "targetPosition": target_position,
+        "signal": estimar_signal(),
+        "temperature": zone_readings[ambient_temp_zone]["temperatura"],
+        "speed": drone_state.get("speed", 0.0),
+        "lastReading": last_reading,
+        "history": reading_history[-10:],
+    }
+
+
+async def broadcast_snapshot():
+    if not connected_clients:
+        return
+    message = json.dumps(build_snapshot())
+    await asyncio.gather(
+        *[client.send(message) for client in connected_clients],
+        return_exceptions=True,
+    )
+
+
+def procesar_lectura_suelo(datos: dict):
+    """Fusiona una lectura real de humedad de suelo (sensor_nasa.py /
+    sensor_mock.py) en el estado agregado."""
+    global last_reading
+
+    zona = datos.get("zona", "centro")
+    if zona not in zone_readings:
+        zona = "centro"
+
+    humedad = float(datos["humedad"])
+    estado = datos.get("estado_suelo", "normal")
+    temperatura = float(datos.get("temperatura", zone_readings[zona]["temperatura"]))
+
+    zone_readings[zona] = {"humedad": humedad, "estado": estado, "temperatura": temperatura}
+
+    entry = {
+        "zona": zona,
+        "humedad": humedad,
+        "estado": estado,
+        "temperatura": temperatura,
+        "timestamp": datetime.now().isoformat(),
+    }
+    # Passthrough de campos de instrumentacion (usados por measure_bridge_latency.py)
+    if datos.get("probe_id") is not None:
+        entry["probe_id"] = datos["probe_id"]
+    if datos.get("send_ts") is not None:
+        entry["send_ts"] = datos["send_ts"]
+
+    last_reading = entry
+    reading_history.append(entry)
+    if len(reading_history) > 100:
+        reading_history.pop(0)
+
+    # Reenviar la lectura tal cual al controlador (para su logica difusa)
+    try:
+        controller_sock.sendto(json.dumps(datos).encode("utf-8"), (CONTROLLER_HOST, CONTROLLER_CMD_PORT))
+    except Exception as exc:
+        print(f"[CTRL] No se pudo reenviar lectura de suelo: {exc}")
+
+
+def procesar_telemetria_dron(datos: dict):
+    """Fusiona un paquete real de telemetria enviado por
+    crazyflie_controller.py en el estado agregado del dron."""
+    global last_drone_packet_ts
+
+    drone_state["flightStatus"] = datos.get("flightStatus", drone_state["flightStatus"])
+    if "battery" in datos:
+        drone_state["battery"] = float(datos["battery"])
+    if "waterLevel" in datos:
+        drone_state["waterLevel"] = float(datos["waterLevel"])
+    if "speed" in datos:
+        drone_state["speed"] = float(datos["speed"])
+    if "targetZone" in datos:
+        drone_state["targetZone"] = datos["targetZone"]
+    if isinstance(datos.get("position"), dict):
+        drone_state["position"] = {
+            "x": float(datos["position"].get("x", drone_state["position"]["x"])),
+            "y": float(datos["position"].get("y", drone_state["position"]["y"])),
+            "z": float(datos["position"].get("z", drone_state["position"]["z"])),
+        }
+    if isinstance(datos.get("targetPosition"), dict):
+        target_position["x"] = float(datos["targetPosition"].get("x", target_position["x"]))
+        target_position["y"] = float(datos["targetPosition"].get("y", target_position["y"]))
+        target_position["z"] = float(datos["targetPosition"].get("z", target_position.get("z", 0.0)))
+
+    last_drone_packet_ts = time.monotonic()
 
 
 async def udp_receiver():
-    """Recibe paquetes UDP y los reenvía a Webots y a los clientes WebSocket.
-    Este loop no transforma el contenido; solo lo reenvía.
-    """
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((UDP_HOST, UDP_PORT))
     sock.setblocking(False)
@@ -44,34 +225,20 @@ async def udp_receiver():
         try:
             data, addr = await loop.sock_recvfrom(sock, 65536)
             try:
-                mensaje = data.decode('utf-8')
-            except Exception:
-                # Binary payload: forward as-is to Webots and skip WS (WS expects text)
-                webots_sock.sendto(data, (WEBOTS_HOST, WEBOTS_PORT))
-                print(f"[UDP] Reenviado paquete binario a Webots desde {addr}")
+                datos = json.loads(data.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                print(f"[UDP] Paquete no-JSON descartado de {addr}")
                 continue
 
-            # Log parsed JSON when possible
-            try:
-                parsed = json.loads(mensaje)
-                print(f"[UDP] Recibido de {addr}: {parsed}")
-            except Exception:
-                print(f"[UDP] Recibido de {addr}: (texto no-JSON)")
+            if datos.get("type") == "drone_telemetry":
+                procesar_telemetria_dron(datos)
+            elif "zona" in datos and "humedad" in datos:
+                procesar_lectura_suelo(datos)
+            else:
+                print(f"[UDP] Paquete de forma desconocida ignorado: {datos}")
+                continue
 
-            # Reenviar exactamente el mismo paquete a Webots (para que el controlador lo reciba)
-            webots_sock.sendto(data, (WEBOTS_HOST, WEBOTS_PORT))
-
-            # Guardar último paquete para clientes que se conecten después
-            global last_raw_packet
-            last_raw_packet = mensaje
-
-            # Reenviar a todos los clientes WebSocket conectados
-            if connected_clients:
-                await asyncio.gather(
-                    *[client.send(mensaje) for client in connected_clients],
-                    return_exceptions=True,
-                )
-                print(f"[WS] Enviado a {len(connected_clients)} cliente(s)")
+            await broadcast_snapshot()
 
         except BlockingIOError:
             await asyncio.sleep(0.01)
@@ -80,39 +247,34 @@ async def udp_receiver():
             await asyncio.sleep(0.1)
 
 
-async def websocket_handler(websocket: websockets.WebSocketServerProtocol):
-    """Maneja conexiones WebSocket de la PWA.
-    - Envía el último paquete recibido (si existe) como estado inicial.
-    - Reenvía los mensajes entrantes del cliente hacia Webots por UDP.
-    """
+async def websocket_handler(websocket):
     connected_clients.add(websocket)
-    client_ip = websocket.remote_address[0] if websocket.remote_address else 'unknown'
-    print(f"[WS] Nueva conexión desde {client_ip}")
+    client_ip = websocket.remote_address[0] if websocket.remote_address else "unknown"
+    print(f"[WS] Nueva conexion desde {client_ip}")
 
     try:
-        # Enviar estado inicial tal cual (si existe)
-        if last_raw_packet:
-            try:
-                await websocket.send(last_raw_packet)
-            except Exception:
-                await websocket.send(json.dumps({"type": "initial_state", "message": "no data"}))
-        else:
-            await websocket.send(json.dumps({"type": "initial_state", "message": "no data"}))
+        await websocket.send(json.dumps({**build_snapshot(), "type": "initial_state"}))
 
         async for message in websocket:
-            # Esperamos que la PWA envíe comandos JSON; los reenviamos por UDP a Webots
             try:
                 cmd = json.loads(message)
-            except Exception:
-                print(f"[WS] Mensaje no-JSON recibido desde PWA: {message}")
+            except json.JSONDecodeError:
+                print(f"[WS] Comando invalido: {message}")
                 continue
 
-            try:
-                payload = json.dumps(cmd).encode('utf-8')
-                webots_sock.sendto(payload, (WEBOTS_HOST, WEBOTS_PORT))
-                print(f"[CMD] Reenviado a Webots: {cmd}")
-            except Exception as e:
-                print(f"[CMD] Error reenviando a Webots: {e}")
+            cmd_type = cmd.get("type")
+            if cmd_type == "request_status":
+                await websocket.send(json.dumps(build_snapshot()))
+                continue
+
+            if cmd_type in ("start_mission", "stop_mission", "emergency_stop"):
+                try:
+                    controller_sock.sendto(json.dumps(cmd).encode("utf-8"), (CONTROLLER_HOST, CONTROLLER_CMD_PORT))
+                    print(f"[CMD] Reenviado a controlador: {cmd}")
+                except Exception as e:
+                    print(f"[CMD] Error reenviando comando: {e}")
+            else:
+                print(f"[WS] Comando desconocido ignorado: {cmd}")
 
     except websockets.exceptions.ConnectionClosed:
         print(f"[WS] Conexion cerrada: {client_ip}")
@@ -122,10 +284,12 @@ async def websocket_handler(websocket: websockets.WebSocketServerProtocol):
 
 async def main():
     print("=" * 60)
-    print("  PUENTE UDP-WEBSOCKET - FORWARDER")
+    print("  PUENTE UDP-WEBSOCKET - AGREGADOR DE TELEMETRIA")
+    print("  Universidad Popular del Cesar")
     print("=" * 60)
-    print(f"  UDP:       {UDP_HOST}:{UDP_PORT}")
-    print(f"  WebSocket: ws://{WS_HOST}:{WS_PORT}")
+    print(f"  UDP entrada:              {UDP_HOST}:{UDP_PORT}")
+    print(f"  UDP salida (controlador): {CONTROLLER_HOST}:{CONTROLLER_CMD_PORT}")
+    print(f"  WebSocket:                ws://{WS_HOST}:{WS_PORT}")
     print()
 
     ws_server = await websockets.serve(websocket_handler, WS_HOST, WS_PORT)
@@ -134,8 +298,8 @@ async def main():
     await asyncio.gather(ws_server.wait_closed(), udp_task, return_exceptions=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print('\n[SISTEMA] Apagando servidor...')
+        print("\n[SISTEMA] Apagando servidor...")

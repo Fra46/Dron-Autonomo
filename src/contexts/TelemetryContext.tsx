@@ -11,6 +11,7 @@ interface TelemetryContextType {
   startMission: (targetZone?: string) => void
   stopMission: () => void
   emergencyStop: () => void
+  requestStatus: () => void
   reconnect: () => void
 }
 

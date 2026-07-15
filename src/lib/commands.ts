@@ -1,5 +1,5 @@
 export interface DroneCommand {
-  type: 'start_mission' | 'stop_mission' | 'emergency_stop'
+  type: 'start_mission' | 'stop_mission' | 'emergency_stop' | 'request_status'
   target_zone?: string
   [key: string]: unknown
 }

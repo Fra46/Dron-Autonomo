@@ -8,6 +8,8 @@ __v0_jsx-dev-runtime.ts
 next.user-config.*
 
 # Environment variables
+.env
+.env.local
 .env*.local
 
 # Common ignores
@@ -22,6 +24,8 @@ dist/
 # Python
 __pycache__/
 *.pyc
+.venv/
+venv/
 
 # Downloaded NASA SMAP data (fetched on demand by scripts/sensor_nasa.py)
 scripts/*.h5

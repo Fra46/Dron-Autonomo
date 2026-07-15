@@ -10,9 +10,14 @@ const ZONE_LABELS: Record<MissionZone, string> = {
 }
 
 export default function MissionControl() {
-  const { telemetry, startMission, stopMission } = useTelemetryContext()
+  const { telemetry, startMission, stopMission, emergencyStop, requestStatus } = useTelemetryContext()
   const [selectedZone, setSelectedZone] = useState<MissionZone>('sur')
-  const activeTargetZone = telemetry.drone.targetZone ?? selectedZone
+  const [syncing, setSyncing] = useState(false)
+  const rawTargetZone = telemetry.drone.targetZone
+  const activeTargetZone: MissionZone =
+    rawTargetZone === 'norte' || rawTargetZone === 'centro' || rawTargetZone === 'sur'
+      ? rawTargetZone
+      : selectedZone
 
   const status = telemetry.drone.flightStatus
   const isReturning = status === 'retorno'
@@ -68,6 +73,47 @@ export default function MissionControl() {
           </svg>
         </span>
         {buttonLabel}
+      </button>
+
+      {missionActive && (
+        <button
+          type="button"
+          onClick={() => emergencyStop()}
+          style={{
+            width: '100%',
+            marginTop: '0.5rem',
+            padding: '0.6rem',
+            borderRadius: 'var(--border-radius-sm)',
+            border: '1px solid var(--lv0)',
+            background: 'transparent',
+            color: 'var(--lv0)',
+            fontWeight: 600,
+          }}
+        >
+          Parada de emergencia
+        </button>
+      )}
+
+      <button
+        type="button"
+        disabled={syncing}
+        onClick={() => {
+          setSyncing(true)
+          requestStatus()
+          setTimeout(() => setSyncing(false), 800)
+        }}
+        style={{
+          width: '100%',
+          marginTop: '0.5rem',
+          padding: '0.5rem',
+          borderRadius: 'var(--border-radius-sm)',
+          border: '1px solid var(--text-muted)',
+          background: 'transparent',
+          color: 'var(--text-secondary)',
+          fontSize: '0.85rem',
+        }}
+      >
+        {syncing ? 'Sincronizando…' : 'Sincronizar estado'}
       </button>
 
       {!missionActive && (

@@ -147,6 +147,10 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
     }))
   }, [sendCommand])
 
+  const requestStatus = useCallback(() => {
+    sendCommand({ type: 'request_status' })
+  }, [sendCommand])
+
   // Initialize
   useEffect(() => {
     console.log('[Telemetry] useEffect ejecutado')
@@ -174,6 +178,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
     startMission,
     stopMission,
     emergencyStop,
+    requestStatus,
     reconnect: connect,
   }
 }

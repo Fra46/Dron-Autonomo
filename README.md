@@ -24,23 +24,26 @@ Sistema completo de riego agrícola autónomo que combina un dron Crazyflie con 
 ## 🏗️ Arquitectura del Sistema
 
 ```
-┌─────────────────┐     UDP (5005)      ┌──────────────────┐     WebSocket (8765)    ┌──────────────┐
-│  sensor_mock.py │ ──────────────────► │  udp_websocket   │ ◄────────────────────► │     PWA      │
-│  sensor_nasa.py │                     │    _bridge.py    │                         │  (Frontend)  │
-└─────────────────┘                     └──────────────────┘                         └──────────────┘
-        │                                       ▲                                       │
-        │                                       │                                       │
-        ▼                                       │                                       │
-┌─────────────────┐                             │                                       │
-│ crazyflie_      │ ◄───────────────────────────┘                                       │
-│ controller.py   │   (Lee mismos datos UDP en Webots)                                  │
-│ (Webots/Dron)   │                                                                       │
-└─────────────────┘                                                                       │
-                                                                                          │
-┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              Webots Simulation Environment                             │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────┐                                  ┌──────────────────┐    WebSocket (8765)    ┌──────────────┐
+│  sensor_nasa.py │ ── UDP 5005 (lectura de suelo) ─► │  udp_websocket   │ ◄─────────────────────► │     PWA      │
+│  sensor_mock.py │                                   │    _bridge.py    │   (snapshot agregado    │  (Frontend)  │
+└─────────────────┘                                   │  (agregador con  │    + comandos de mision) └──────────────┘
+                                                       │     estado)      │
+┌─────────────────┐                                   │                  │
+│ crazyflie_      │ ── UDP 5005 (drone_telemetry) ──► │                  │
+│ controller.py   │ ◄─ UDP 5006 (lecturas + cmds) ──  └──────────────────┘
+│ (Webots/Dron)   │
+└─────────────────┘
+        │
+┌───────▼─────────────────────────────────────────────────────────────────┐
+│                       Webots Simulation Environment                     │
+└───────────────────────────────────────────────────────────────────────────┘
 ```
+
+El bridge fusiona ambas fuentes (humedad de suelo + telemetría real del dron) en
+un único snapshot `telemetry_update` (ver `docs/TELEMETRY.md`), y reenvía los
+comandos de misión que la PWA envía por WebSocket (`start_mission`,
+`stop_mission`, `emergency_stop`, `request_status`) hacia el controlador por UDP.
 
 ### Componentes del Sistema
 
@@ -110,14 +113,26 @@ pip install earthaccess h5py numpy
 
 ### 📖 Configuración de Credenciales NASA (Importante ⭐)
 
-Si quieres usar **datos reales del satélite SMAP de NASA**, `scripts/sensor_nasa.py` se autentica via EarthAccess con estas variables de entorno:
+Si quieres usar **datos reales del satélite SMAP de NASA** (fuente de datos
+principal del proyecto), `scripts/sensor_nasa.py` se autentica via EarthAccess
+con estas variables de entorno, tomadas de un archivo `.env` en la raíz del
+proyecto (copia `.env.example` como `.env` y completa tus credenciales):
 - `EARTHDATA_USERNAME`
 - `EARTHDATA_PASSWORD`
 - o `EARTHDATA_TOKEN`
 
 El script también acepta los alias `EARTHACCESS_USERNAME`, `EARTHACCESS_PASSWORD` y `EARTHACCESS_TOKEN`.
 
-Si no configuras credenciales, el sistema cae automáticamente a modo simulación.
+Si no configuras credenciales, o si la conexión remota a NASA falla, el sistema
+cae automáticamente a un fallback simulado sin interrumpir el flujo de telemetría.
+
+> 🔒 **Seguridad:** `.env` está en `.gitignore` y **nunca debe commitearse** —
+> solo `.env.example` (con placeholders) va al repositorio. Si en algún momento
+> un `.env` real llegó a commitearse por error, las credenciales que contenía
+> deben considerarse comprometidas: revócalas/regenéralas en
+> https://urs.earthdata.nasa.gov/ y, si el repositorio es público o tiene
+> colaboradores externos, purga el archivo del historial de git (por ejemplo
+> con `git filter-repo --path .env --invert-paths`).
 
 > ⚠️ Nota de mantenimiento: esta sección enlazaba antes a `scripts/NASA_CREDENTIALS.md` y `scripts/MEJORAS_SISTEMA_SENSORES.md`, pero ninguno de los dos archivos existe en el repo. Si alguien del equipo los tiene localmente, súbanlos a `docs/` — mientras tanto se quitaron los enlaces rotos.
 
@@ -137,17 +152,26 @@ cd scripts
 python udp_websocket_bridge.py
 ```
 
-**Terminal 2 — Sensor de datos:**
+**Terminal 2 — Sensor de datos (fuente principal: NASA SMAP):**
 ```bash
-# Opción A: Datos simulados (rápido, sin dependencias)
-python sensor_mock.py
-
-# Opción B: Datos reales NASA (requiere credenciales)
+# Opción A (recomendada): datos reales del satélite NASA SMAP
+# Requiere credenciales en .env — ver "Configuración de Credenciales NASA" abajo.
 python sensor_nasa.py
-# → Si no hay credenciales, usa fallback a simulación automáticamente
+# → Si no hay credenciales o falla la conexión remota, cae automáticamente
+#   a un fallback simulado compatible, sin detener el flujo de telemetría.
+
+# Opción B: simulador puro, útil solo para desarrollo rápido sin red/credenciales
+python sensor_mock.py
 ```
 
-**Terminal 3 — PWA Frontend:**
+**Terminal 3 — Simulación del dron (Webots):**
+```bash
+# Abrir el mundo de Webots y cargar crazyflie_controller.py como controlador
+# del robot. Emite telemetría real (posición, batería estimada, estado de
+# la máquina de estados) de vuelta al bridge en el puerto 5005.
+```
+
+**Terminal 4 — PWA Frontend:**
 ```bash
 # En la raíz del proyecto
 npm run dev
@@ -158,12 +182,11 @@ npm run dev
 
 | Modo | Comando | Datos | Velocidad | Requisitos |
 |------|---------|-------|-----------|-----------|
+| **NASA SMAP Real** (recomendado) | `sensor_nasa.py` | Satélite real, con fallback simulado integrado | 🐢 Lento (1a) | Credenciales NASA en `.env` |
 | **Simulación** | `sensor_mock.py` | Aleatorios realistas | ⚡ Rápido | Ninguno |
-| **NASA SMAP Real** | `sensor_nasa.py` | Satélite real | 🐢 Lento (1a) | Credenciales NASA |
-| **Simulación Completa** | Webots + `crazyflie_controller.py` | Física realista | 🐢 Muy lento | Webots instalado |
-| **Dev/Testing** | Sin sensor, PWA en SIM | Mock local | ⚡⚡ Instántaneo | Nada |
+| **Simulación Completa** | Webots + `crazyflie_controller.py` | Física realista + telemetría real del dron | 🐢 Muy lento | Webots instalado |
 
-✅ **Nota:** Si `sensor_nasa.py` no tiene credenciales, **automáticamente cambia a datos simulados.**
+✅ **Nota:** Si `sensor_nasa.py` no tiene credenciales o falla la conexión remota, **automáticamente cambia a datos simulados** sin interrumpir el flujo de telemetría hacia la PWA.
 
 ## 📁 Estructura del Proyecto
 
@@ -177,7 +200,7 @@ agrodron-autonomo/
 │   │   └── TelemetryContext.tsx
 │   ├── hooks/
 │   │   └── use-telemetry.ts
-│   ├── lib/                   # telemetry.ts, telemetrySocket.ts, telemetrySimulation.ts, commands.ts, uiUtils.ts
+│   ├── lib/                   # telemetry.ts, telemetrySocket.ts, commands.ts, uiUtils.ts
 │   └── styles/
 │       └── globals.css
 ├── 📁 public/                 # Archivos estáticos e íconos PWA
@@ -234,12 +257,18 @@ VITE_WS_PORT=8765
 
 ### Puertos Utilizados
 
-| Servicio | Puerto | Protocolo |
-|----------|--------|-----------|
-| Frontend PWA | 3000 | HTTP |
-| Puente WebSocket | 8765 | WebSocket |
-| Sensores UDP | 5005 | UDP |
-| Webots (opcional) | 1999 | TCP |
+| Servicio | Puerto | Protocolo | Dirección |
+|----------|--------|-----------|-----------|
+| Frontend PWA | 3000 | HTTP | — |
+| Puente WebSocket | 8765 | WebSocket | Bridge ↔ PWA |
+| Bridge — entrada de telemetría | 5005 | UDP | Sensores de suelo → Bridge, Dron → Bridge |
+| Bridge — salida al controlador | 5006 | UDP | Bridge → `crazyflie_controller.py` (lecturas reenviadas + comandos de misión) |
+| Webots (opcional) | 1999 | TCP | — |
+
+> ⚠️ Importante: 5005 y 5006 son puertos distintos a propósito. Si ambos procesos
+> (`udp_websocket_bridge.py` y `crazyflie_controller.py` en Webots) intentaran
+> escuchar en el mismo puerto UDP en la misma máquina, uno de los dos fallaría
+> al iniciar (`Address already in use`).
 
 ## 🎯 Estados del Sistema
 
@@ -254,7 +283,28 @@ VITE_WS_PORT=8765
 | `retorno` | Regresando a base |
 | `descenso` | Aterrizando |
 
-### Niveles de Humedad
+### Comandos de Misión
+
+Implementados exactamente como se describen en el paper (sección 2.4), enviados
+por la PWA vía WebSocket y reenviados por el bridge al controlador por UDP:
+
+| Comando | Botón en la PWA | Efecto |
+|---------|-----------------|--------|
+| `start_mission` | "Iniciar misión a \<zona\>" | `idle → ascenso`, con zona objetivo asignada |
+| `stop_mission` | "Detener Misión" | Detiene la misión activa y ordena retorno a base |
+| `emergency_stop` | "Parada de emergencia" | Transición inmediata a descenso seguro |
+| `request_status` | "Sincronizar estado" | Solicita sincronización inmediata de telemetría |
+
+### Lógica Difusa de Activación de Riego
+
+Implementada en `crazyflie_controller.py` exactamente como en las ecuaciones
+(1)-(3) del paper: se activa una misión cuando `μ_dry(h) + μ_very_dry(h) > θ`,
+con `θ = 0.65` (calibrado empíricamente, ver Tabla 2 del paper).
+
+### Niveles de Humedad (color de interfaz)
+
+Nota: esta escala LV0-LV5 es solo para la visualización de color en la PWA
+(no es el mismo umbral que la lógica difusa de activación de riego, arriba).
 
 | Nivel | Rango | Estado | Color | Acción |
 |-------|-------|--------|-------|--------|
@@ -266,6 +316,7 @@ VITE_WS_PORT=8765
 | LV5 | 85-100% | Saturado | 🟣 Púrpura | Exceso |
 
 ## 🤝 Contribución
+
 
 1. Fork el proyecto
 2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
