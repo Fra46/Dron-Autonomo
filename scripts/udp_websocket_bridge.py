@@ -165,7 +165,10 @@ def procesar_lectura_suelo(datos: dict):
         "humedad": humedad,
         "estado": estado,
         "temperatura": temperatura,
-        "timestamp": datetime.now().isoformat(),
+        # Preferir el timestamp generado por el propio sensor (paper, seccion 2.2:
+        # "each telemetry packet includes... timestamp"). Solo se usa la hora del
+        # bridge como respaldo si un sensor viejo no lo envia.
+        "timestamp": datos.get("timestamp") or datetime.now().isoformat(),
     }
     # Passthrough de campos de instrumentacion (usados por measure_bridge_latency.py)
     if datos.get("probe_id") is not None:
@@ -264,7 +267,13 @@ async def websocket_handler(websocket):
 
             cmd_type = cmd.get("type")
             if cmd_type == "request_status":
-                await websocket.send(json.dumps(build_snapshot()))
+                reply = build_snapshot()
+                # Eco del timestamp del cliente (medido con SU propio reloj de
+                # navegador) para que la PWA calcule latencia real ida-y-vuelta
+                # sin depender de que los relojes de dos maquinas esten sincronizados.
+                if cmd.get("client_ts") is not None:
+                    reply["pingTs"] = cmd["client_ts"]
+                await websocket.send(json.dumps(reply))
                 continue
 
             if cmd_type in ("start_mission", "stop_mission", "emergency_stop"):

@@ -20,10 +20,18 @@ export default function TelemetryBar() {
   const speed = telemetry.speed ?? 0
   const temperature = telemetry.temperature ?? 0
   const currentFlightStatus = telemetry.drone.flightStatus ?? 'idle'
+  const latencyMs = telemetry.pwaLatencyMs
 
   const getBatteryColor = (level: number) => {
     if (level > 60) return 'var(--lv3)'
     if (level > 30) return 'var(--lv2)'
+    return 'var(--lv0)'
+  }
+
+  const getLatencyColor = (ms: number | null) => {
+    if (ms === null) return 'var(--text-muted)'
+    if (ms < 100) return 'var(--lv3)'
+    if (ms < 300) return 'var(--lv2)'
     return 'var(--lv0)'
   }
 
@@ -73,7 +81,7 @@ export default function TelemetryBar() {
           </div>
         </Col>
 
-        <Col xs={4} md={2}>
+        <Col xs={4} md={1}>
           <div className="telemetry-item">
             <div>
               <div className="telemetry-label">Altitud</div>
@@ -82,7 +90,7 @@ export default function TelemetryBar() {
           </div>
         </Col>
 
-        <Col xs={4} md={2}>
+        <Col xs={4} md={1}>
           <div className="telemetry-item">
             <div>
               <div className="telemetry-label">Velocidad</div>
@@ -91,11 +99,22 @@ export default function TelemetryBar() {
           </div>
         </Col>
 
-        <Col xs={4} md={2}>
+        <Col xs={4} md={1}>
           <div className="telemetry-item">
             <div>
               <div className="telemetry-label">Temp</div>
               <div className="telemetry-value">{temperature.toFixed(0)}°C</div>
+            </div>
+          </div>
+        </Col>
+
+        <Col xs={6} md={2}>
+          <div className="telemetry-item">
+            <div>
+              <div className="telemetry-label">Latencia PWA↔Bridge</div>
+              <div className="telemetry-value" style={{ color: getLatencyColor(latencyMs) }}>
+                {latencyMs === null ? '—' : `${latencyMs.toFixed(0)} ms`}
+              </div>
             </div>
           </div>
         </Col>

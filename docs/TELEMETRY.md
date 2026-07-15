@@ -84,9 +84,16 @@ La PWA se conecta automáticamente al WebSocket en `ws://localhost:8765`.
   "zona": "norte",
   "humedad": 45,
   "estado_suelo": "seco",
-  "temperatura": 32.5
+  "temperatura": 32.5,
+  "timestamp": "2026-07-15T10:51:46.957653"
 }
 ```
+
+`timestamp` lo genera el propio sensor (`datetime.now().isoformat()`), no el
+bridge — así queda alineado con el paper (sección 2.2: "each telemetry packet
+includes... timestamp"). El bridge solo genera su propio timestamp como
+respaldo si un sensor viejo no lo envía (`procesar_lectura_suelo` en
+`udp_websocket_bridge.py`).
 
 **Valores de zona:** `norte`, `centro`, `sur`
 
@@ -224,11 +231,31 @@ responde directamente sin tocar el controlador):
 {"type": "start_mission", "target_zone": "sur"}
 {"type": "stop_mission"}
 {"type": "emergency_stop"}
-{"type": "request_status"}
+{"type": "request_status", "client_ts": 1784112707551}
 ```
 
 Los cuatro están expuestos en la UI de `MissionControl.tsx` ("Iniciar misión",
 "Detener Misión", "Parada de emergencia", "Sincronizar estado").
+
+## Latencia en vivo en la PWA (panel "Latencia PWA↔Bridge")
+
+Además del script de consola (`measure_bridge_latency.py`), la propia PWA
+muestra su latencia real ida-y-vuelta en `TelemetryBar.tsx`, sin depender de
+relojes sincronizados entre máquinas:
+
+1. La PWA envía `request_status` con `client_ts: Date.now()` (su propio reloj
+   de navegador) — automáticamente cada 3s mientras esté conectada (ver
+   `use-telemetry.ts`), además de cuando el usuario presiona "Sincronizar estado".
+2. El bridge responde a **ese cliente específico** (no lo transmite a todos)
+   con el snapshot habitual más un campo extra `pingTs` = el mismo `client_ts`
+   que recibió, sin modificarlo.
+3. La PWA calcula `latencia = Date.now() - pingTs` — con su propio reloj en
+   ambos extremos de la resta, así que no importa si el bridge corre en otra
+   máquina de la LAN con un reloj distinto; el número es correcto de todas formas.
+
+Esto es lo mismo que hace `measure_bridge_latency.py` (single-observer: quien
+mide es el mismo proceso que envía y recibe), aplicado dentro del navegador
+para que se vea en vivo durante la demo, incluso desde un teléfono.
 
 ## Componentes de la PWA
 

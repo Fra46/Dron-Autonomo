@@ -11,6 +11,7 @@ import glob
 import sys
 import concurrent.futures
 from pathlib import Path
+from datetime import datetime
 
 DESTINO_IP     = "127.0.0.1"
 DESTINO_PUERTO = 5005
@@ -330,6 +331,7 @@ try:
             "humedad"     : paquete["humedad"],
             "estado_suelo": interpretar_humedad(paquete["humedad"]),
             "temperatura" : round(random.uniform(28.0, 38.0), 1), 
+            "timestamp"   : datetime.now().isoformat(),  # generado en el sensor, no en el bridge
         }
 
         mensaje = json.dumps(datos).encode()

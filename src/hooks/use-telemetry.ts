@@ -56,10 +56,25 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
       onMessage: (message) => {
         console.log('[Telemetry] Mensaje recibido:', message)
         const parsed = parseWSMessage(message)
-        if (parsed) {
+
+        // Latencia real ida-y-vuelta: si este mensaje es el eco directo de un
+        // request_status con client_ts, se calcula con el reloj del propio
+        // navegador (evita depender de sincronizacion de relojes entre maquinas).
+        let latencyUpdate: { pwaLatencyMs: number } | null = null
+        try {
+          const raw = JSON.parse(message)
+          if (typeof raw?.pingTs === 'number') {
+            latencyUpdate = { pwaLatencyMs: Date.now() - raw.pingTs }
+          }
+        } catch {
+          // Mensaje no parseable como JSON crudo; parseWSMessage ya maneja ese caso.
+        }
+
+        if (parsed || latencyUpdate) {
           setTelemetry(prev => ({
             ...prev,
             ...parsed,
+            ...latencyUpdate,
             lastSync: Date.now(),
           }))
         }
@@ -148,7 +163,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
   }, [sendCommand])
 
   const requestStatus = useCallback(() => {
-    sendCommand({ type: 'request_status' })
+    sendCommand({ type: 'request_status', client_ts: Date.now() })
   }, [sendCommand])
 
   // Initialize
@@ -170,6 +185,16 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
       }
     }
   }, [connect])
+
+  // Ping periodico para medir latencia real en vivo (panel de TelemetryBar).
+  // Solo mientras haya conexion activa, para no encolar comandos inutilmente.
+  useEffect(() => {
+    if (!isConnected) return
+    const pingInterval = setInterval(() => {
+      sendCommand({ type: 'request_status', client_ts: Date.now() })
+    }, 3000)
+    return () => clearInterval(pingInterval)
+  }, [isConnected, sendCommand])
 
   return {
     telemetry,

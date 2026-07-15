@@ -67,6 +67,9 @@ export interface TelemetryData {
   waterLevel: number
   irrigationStatus: IrrigationStatus
   nodeReadings: TelemetryNodeReading[]
+  // Latencia real ida-y-vuelta PWA <-> bridge, medida con el reloj del propio
+  // navegador (ver requestStatus/ping en use-telemetry.ts). null = sin medir aun.
+  pwaLatencyMs: number | null
 }
 
 const DEFAULT_COORDINATES: Coordinates = {
@@ -109,6 +112,7 @@ export const DEFAULT_TELEMETRY: TelemetryData = {
   waterLevel: 100,
   irrigationStatus: 'idle',
   nodeReadings: [],
+  pwaLatencyMs: null,
 }
 
 export const calculateHumidityLevel = (humedad: number): HumidityLevel => {

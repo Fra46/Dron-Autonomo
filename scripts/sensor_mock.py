@@ -17,6 +17,7 @@ import json
 import random
 import time
 import itertools
+from datetime import datetime
 
 # ── Configuración de red ──────────────────────────────────────────────────────
 DESTINO_IP     = "127.0.0.1"   # localhost: mismo equipo que Webots
@@ -65,6 +66,7 @@ def generar_datos(zona: dict) -> dict:
         "temperatura" : round(random.uniform(25.0, 35.0), 1),      # °C
         "bateria"     : random.randint(60, 100),                    # % batería del nodo
         "estado_suelo": interpretar_humedad(humedad),
+        "timestamp"   : datetime.now().isoformat(),                 # generado en el sensor, no en el bridge
     }
 
 
