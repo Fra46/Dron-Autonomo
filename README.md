@@ -121,6 +121,19 @@ proyecto (copia `.env.example` como `.env` y completa tus credenciales):
 - `EARTHDATA_PASSWORD`
 - o `EARTHDATA_TOKEN`
 
+
+También puedes guardarlo de forma más segura en el almacén de secretos del sistema
+(con `keyring`) para no dejarlo en archivos de texto. En Windows, por ejemplo:
+
+```powershell
+python -m pip install keyring
+python scripts/set_earthdata_token.py "TU_TOKEN_AQUI"
+```
+
+Este comando guarda el token sin pedirte que lo pegues interactivamente en el
+terminal. El script lo leerá automáticamente si no encuentra `EARTHDATA_TOKEN`
+en el entorno o en `.env`.
+
 El script también acepta los alias `EARTHACCESS_USERNAME`, `EARTHACCESS_PASSWORD` y `EARTHACCESS_TOKEN`.
 
 Si no configuras credenciales, o si la conexión remota a NASA falla, el sistema

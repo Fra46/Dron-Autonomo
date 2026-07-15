@@ -13,6 +13,8 @@ import concurrent.futures
 from pathlib import Path
 from datetime import datetime
 
+from earthdata_credentials import resolve_earthdata_credentials
+
 DESTINO_IP     = "127.0.0.1"
 DESTINO_PUERTO = 5005
 
@@ -26,65 +28,15 @@ print("🌍 Conectando con NASA SMAP...")
 print()
 
 # EarthAccess usa EARTHDATA_USERNAME / EARTHDATA_PASSWORD o EARTHDATA_TOKEN.
-# Permitimos también alias comunes y un archivo .env para facilitar la configuración.
-def load_dotenv_if_present():
-    candidates = [
-        Path(__file__).resolve().parent / ".env",
-        Path(__file__).resolve().parents[1] / ".env",
-    ]
-
-    for path in candidates:
-        if not path.exists():
-            continue
-
-        try:
-            with path.open("r", encoding="utf-8") as handle:
-                for raw_line in handle:
-                    line = raw_line.strip()
-                    if not line or line.startswith("#") or "=" not in line:
-                        continue
-
-                    key, value = line.split("=", 1)
-                    key = key.strip()
-                    value = value.strip().strip('"').strip("'")
-                    if not value:
-                        continue
-
-                    aliases = {
-                        "EARTHDATA_USERNAME": "EARTHDATA_USERNAME",
-                        "EARTHACCESS_USERNAME": "EARTHDATA_USERNAME",
-                        "NASA_USERNAME": "EARTHDATA_USERNAME",
-                        "EARTHDATA_PASSWORD": "EARTHDATA_PASSWORD",
-                        "EARTHACCESS_PASSWORD": "EARTHDATA_PASSWORD",
-                        "NASA_PASSWORD": "EARTHDATA_PASSWORD",
-                        "EARTHDATA_TOKEN": "EARTHDATA_TOKEN",
-                        "EARTHACCESS_TOKEN": "EARTHDATA_TOKEN",
-                        "NASA_TOKEN": "EARTHDATA_TOKEN",
-                    }
-
-                    target = aliases.get(key)
-                    if target:
-                        os.environ.setdefault(target, value)
-        except Exception as exc:
-            print(f"⚠️ No pude leer {path}: {exc}")
-
-
+# Permitimos también alias comunes, un archivo .env y un secret del sistema.
 def sync_earthdata_env_vars():
-    load_dotenv_if_present()
-
-    env = os.environ
-    aliases = {
-        "EARTHACCESS_USERNAME": "EARTHDATA_USERNAME",
-        "NASA_USERNAME": "EARTHDATA_USERNAME",
-        "EARTHACCESS_PASSWORD": "EARTHDATA_PASSWORD",
-        "NASA_PASSWORD": "EARTHDATA_PASSWORD",
-        "EARTHACCESS_TOKEN": "EARTHDATA_TOKEN",
-        "NASA_TOKEN": "EARTHDATA_TOKEN",
-    }
-
-    for alias, target in aliases.items():
-        if env.get(alias):
-            os.environ.setdefault(target, env[alias])
+    credentials = resolve_earthdata_credentials()
+    if credentials.get("EARTHDATA_USERNAME"):
+        os.environ.setdefault("EARTHDATA_USERNAME", credentials["EARTHDATA_USERNAME"])
+    if credentials.get("EARTHDATA_PASSWORD"):
+        os.environ.setdefault("EARTHDATA_PASSWORD", credentials["EARTHDATA_PASSWORD"])
+    if credentials.get("EARTHDATA_TOKEN"):
+        os.environ.setdefault("EARTHDATA_TOKEN", credentials["EARTHDATA_TOKEN"])
 
 
 def has_nasa_credentials():
