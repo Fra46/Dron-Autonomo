@@ -35,7 +35,7 @@ BRIDGE_TELEMETRY_PORT = 5005
 TELEMETRY_INTERVAL_S = 1.0   # ~1 Hz, igual que el resto del pipeline (paper: "1 Hz nominal")
 
 # ── 2. PARÁMETROS DE VUELO ───────────────────────────────────────────────────
-ALTURA_OBJETIVO = 1.0    # Altura de crucero en metros (el dron vuela a esta altura)
+ALTURA_OBJETIVO = 2.0    # Altura de crucero en metros (el dron vuela a esta altura)
 ALTURA_SUELO    = 0.05   # Si el GPS marca menos de 5cm, se considera que aterrizó
 
 # Márgenes de error aceptables para considerar que llegó al destino
@@ -43,15 +43,17 @@ TOLERANCIA_XY  = 0.15    # metros — tolerancia horizontal (llegar a la zona)
 TOLERANCIA_Z   = 0.05    # metros — tolerancia vertical (alcanzar la altura de crucero)
 
 # Cuántos segundos (simulados) riega el dron antes de volver a casa
-TIEMPO_RIEGO_S = 10.0
+TIEMPO_RIEGO_S = 20.0
 
 # Posiciones físicas (X, Y) dentro del mundo 3D de Webots para cada zona del Cesar
 # Estas coordenadas corresponden a norte, centro y sur del área monitoreada
 COORDENADAS_ZONAS = {
-    "norte":  [ 1.5,  1.5],
-    "centro": [ 0.0,  0.0],
-    "sur":    [-1.5, -1.5],
+    "norte":  [ 6.0, 2.9],
+    "centro": [ 1.7, 2.9],
+    "sur":    [-2.5, 2.9],
 }
+
+BASE_XY = [1.65, 6.32]
 
 # ── 3. GANANCIAS PID ─────────────────────────────────────────────────────────
 # Estas ganancias son idénticas a las del archivo crazyflie.c original de Webots.
@@ -64,17 +66,17 @@ KP_ATT_Y   = 1.0    # Cuánto corrige la rotación sobre el eje vertical (yaw)
 KD_ATT_Y   = 0.5    # Amortigua oscilaciones en la rotación (no se usa actualmente)
 
 # Controlador de velocidad horizontal (cuánto se inclina para moverse)
-KP_VEL_XY  = 2.0    # Ganancia proporcional de velocidad horizontal
-KD_VEL_XY  = 0.5    # Amortigua cambios bruscos de velocidad horizontal
+KP_VEL_XY  = 1.0    # Ganancia proporcional de velocidad horizontal
+KD_VEL_XY  = 0.2    # Amortigua cambios bruscos de velocidad horizontal
 
 # Controlador de altura (mantiene o cambia la altitud del dron)
-KP_Z       = 10.0   # Responde agresivamente a errores de altura
-KI_Z       = 5.0    # Elimina el error estático acumulado en altura
-KD_Z       = 5.0    # Amortigua las oscilaciones verticales
+KP_Z       = 5.0   # Responde agresivamente a errores de altura
+KI_Z       = 0.5    # Elimina el error estático acumulado en altura
+KD_Z       = 2.5    # Amortigua las oscilaciones verticales
 
 # Empuje base en hover: valor constante que compensa la gravedad
 # (viene hardcoded como "+48" en pid_controller.c del firmware original)
-THRUST_BASE = 48.0
+THRUST_BASE = 47.0
 
 # ── 4. LÓGICA DIFUSA ─────────────────────────────────────────────────────────
 # Implementa exactamente las ecuaciones (1)-(3) del paper "AgroDrone:
@@ -179,6 +181,8 @@ def pid_fixed_height_controller(actual_altitude, desired_altitude, dt):
         + KI_Z * pid.altitude_integrator             # Integral (elimina offset)
         + THRUST_BASE                                # Empuje base para contrarrestar gravedad
     )
+    
+    altitude_cmd = constrain(altitude_cmd, 35.0, 60.0)
 
     # Guardar el error actual para el siguiente paso
     pid.past_altitude_error = altitude_error
@@ -462,7 +466,7 @@ while robot.step(timestep) != -1:
         elif tipo == "stop_mission":
             if estado in (ASCENSO, NAVEGANDO, REGANDO):
                 print("  [PWA] stop_mission → iniciando RETORNO.")
-                objetivo_xy = [0.0, 0.0]
+                objetivo_xy = BASE_XY.copy()
                 estado      = RETORNO
 
         elif tipo == "emergency_stop":
@@ -490,10 +494,12 @@ while robot.step(timestep) != -1:
                           f"Iniciando ASCENSO → objetivo {objetivo_xy}")
 
             elif estado == REGANDO:
-                # Si ya está regando y la humedad se normalizó → volver a casa
-                if not requiere_riego(humedad):
+                # Si ya está regando y la humedad de la ZONA OBJETIVO (no de
+                # cualquier otra zona que llegue en la ronda del sensor) se
+                # normalizó → volver a casa.
+                if zona == objetivo_zona and not requiere_riego(humedad):
                     print(f"  Zona {zona.upper()} ya no requiere riego. Iniciando RETORNO.")
-                    objetivo_xy = [0.0, 0.0]
+                    objetivo_xy = BASE_XY.copy()
                     estado      = RETORNO
 
     except BlockingIOError:
@@ -586,7 +592,7 @@ while robot.step(timestep) != -1:
             if timer_riego >= TIEMPO_RIEGO_S:
                 # Tiempo de riego completado → iniciar regreso a base
                 print(f"  Riego completado ({TIEMPO_RIEGO_S}s). Iniciando RETORNO")
-                objetivo_xy = [0.0, 0.0]   # La base está en el origen [0, 0]
+                objetivo_xy = BASE_XY.copy()   # La base está en el origen [0, 0]
                 estado      = RETORNO
 
         # ── RETORNO: Volar de vuelta al punto de despegue [0, 0] ─────────────
@@ -600,12 +606,15 @@ while robot.step(timestep) != -1:
             distancia_xy = math.sqrt(error_x**2 + error_y**2)
             if distancia_xy < TOLERANCIA_XY:
                 print(f"  Base alcanzada. Iniciando DESCENSO")
+                pid.altitude_integrator = 0.0
+                pid.past_altitude_error = 0.0
                 estado = DESCENSO   # Llegó a casa → comenzar a bajar
 
         # ── DESCENSO: Bajar controladamente hasta tocar tierra ────────────────
         elif estado == DESCENSO:
             # Reducir la altura deseada gradualmente (0.3 m/s de descenso)
-            height_desired = max(0.0, actual_altitude - 0.3 * dt)
+            height_desired -= 0.15 * dt
+            height_desired = max(0.0, height_desired)
             desired_vx     = 0.0   # Sin movimiento horizontal durante el descenso
             desired_vy     = 0.0
 
@@ -629,6 +638,9 @@ while robot.step(timestep) != -1:
         pitch_desired, roll_desired = pid_horizontal_velocity_controller(
             actual_vx, actual_vy, desired_vx, desired_vy, dt
         )
+        
+        pitch_desired = constrain(pitch_desired, -0.15, 0.15)
+        roll_desired  = constrain(roll_desired, -0.15, 0.15)
 
         # Paso 2: Error de altura → comando de empuje total
         altitude_cmd = pid_fixed_height_controller(actual_altitude, height_desired, dt)

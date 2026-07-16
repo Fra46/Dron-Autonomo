@@ -65,6 +65,17 @@ drone_state = {
 target_position = {"x": 50.0, "y": 80.0, "z": 0.0}
 last_drone_packet_ts: Optional[float] = None
 
+# Efecto real de riego: mientras el dron esta REGANDO una zona, su humedad
+# sube (esto es lo que hace que la mision tenga sentido - sin esto, regar
+# no cambiaba nada y la zona volvia a activar otra mision de inmediato).
+# Se modela como un "boost" que se SUMA a la lectura cruda del sensor antes
+# de fusionarla, y se aplica tanto a lo que ve la PWA como a lo que se
+# reenvia al controlador (asi la logica difusa del controlador ve el mismo
+# valor "verdadero" que la PWA, no uno crudo y otro corregido).
+IRRIGATION_INCREMENT = 5.0   # % de humedad que sube por cada tick de riego (~1 Hz)
+IRRIGATION_DECAY = 0.3       # % que se evapora por tick cuando no se riega
+irrigation_boost = {"norte": 0.0, "centro": 0.0, "sur": 0.0}
+
 connected_clients: Set = set()
 
 # Socket UDP de salida hacia el controlador (comandos + reenvio de suelo)
@@ -84,6 +95,20 @@ def calcular_nivel_humedad(humedad: float) -> str:
     if humedad < 85:
         return "lv4"
     return "lv5"
+
+
+def estado_desde_humedad(humedad: float) -> str:
+    """Misma clasificacion de 4 categorias que interpretar_humedad() en
+    sensor_mock.py / sensor_nasa.py, recalculada aqui porque la etiqueta que
+    trae el paquete crudo del sensor puede quedar desactualizada despues de
+    aplicar el boost de riego."""
+    if humedad >= 70:
+        return "humedo"
+    if humedad >= 50:
+        return "normal"
+    if humedad >= 30:
+        return "seco"
+    return "muy_seco"
 
 
 def calcular_zonas_humedad() -> dict:
@@ -147,15 +172,20 @@ async def broadcast_snapshot():
 
 def procesar_lectura_suelo(datos: dict):
     """Fusiona una lectura real de humedad de suelo (sensor_nasa.py /
-    sensor_mock.py) en el estado agregado."""
+    sensor_mock.py) en el estado agregado, aplicando el efecto de riego
+    acumulado (irrigation_boost) si el dron ha estado regando esa zona."""
     global last_reading
 
     zona = datos.get("zona", "centro")
     if zona not in zone_readings:
         zona = "centro"
 
-    humedad = float(datos["humedad"])
-    estado = datos.get("estado_suelo", "normal")
+    humedad_cruda = float(datos["humedad"])
+    boost = irrigation_boost.get(zona, 0.0)
+    humedad = min(100.0, humedad_cruda + boost)
+    # La etiqueta la recalculamos aqui (no la que trae el paquete) porque
+    # puede quedar desactualizada despues de sumar el boost de riego.
+    estado = estado_desde_humedad(humedad)
     temperatura = float(datos.get("temperatura", zone_readings[zona]["temperatura"]))
 
     zone_readings[zona] = {"humedad": humedad, "estado": estado, "temperatura": temperatura}
@@ -181,9 +211,13 @@ def procesar_lectura_suelo(datos: dict):
     if len(reading_history) > 100:
         reading_history.pop(0)
 
-    # Reenviar la lectura tal cual al controlador (para su logica difusa)
+    # Reenviar al controlador la lectura YA CORREGIDA (con el boost de riego
+    # aplicado), no la cruda — asi la logica difusa del controlador ve el
+    # mismo valor "verdadero" que la PWA, y detecta correctamente cuando una
+    # zona que se estaba regando ya no lo necesita.
+    paquete_corregido = {**datos, "humedad": humedad, "estado_suelo": estado}
     try:
-        controller_sock.sendto(json.dumps(datos).encode("utf-8"), (CONTROLLER_HOST, CONTROLLER_CMD_PORT))
+        controller_sock.sendto(json.dumps(paquete_corregido).encode("utf-8"), (CONTROLLER_HOST, CONTROLLER_CMD_PORT))
     except Exception as exc:
         print(f"[CTRL] No se pudo reenviar lectura de suelo: {exc}")
 
@@ -212,6 +246,19 @@ def procesar_telemetria_dron(datos: dict):
         target_position["x"] = float(datos["targetPosition"].get("x", target_position["x"]))
         target_position["y"] = float(datos["targetPosition"].get("y", target_position["y"]))
         target_position["z"] = float(datos["targetPosition"].get("z", target_position.get("z", 0.0)))
+
+    # Efecto real de riego: mientras el dron esta "regando" la zona objetivo,
+    # su humedad sube en cada tick de telemetria (~1 Hz, ver
+    # TELEMETRY_INTERVAL_S en crazyflie_controller.py). El resto de zonas (y
+    # esta misma cuando no se riega) se evaporan lentamente. El boost se
+    # aplica a la proxima lectura cruda que llegue en procesar_lectura_suelo,
+    # que sigue siendo la fuente de verdad de cada zona.
+    target_zone = drone_state.get("targetZone")
+    for zona in irrigation_boost:
+        if drone_state["flightStatus"] == "regando" and zona == target_zone:
+            irrigation_boost[zona] = min(60.0, irrigation_boost[zona] + IRRIGATION_INCREMENT)
+        else:
+            irrigation_boost[zona] = max(0.0, irrigation_boost[zona] - IRRIGATION_DECAY)
 
     last_drone_packet_ts = time.monotonic()
 
