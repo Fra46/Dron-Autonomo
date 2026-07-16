@@ -21,8 +21,8 @@ const ZONE_LAYOUT: Record<ZoneNode['id'], { x: number; y: number }> = {
   sur: { x: 50, y: 80 },
 }
 
-// Posición de la base (agrícola)
-const BASE_POSITION = { x: 20, y: 90 }  // Ajusta según tu ubicación real
+// Posición de la base (agrícola) - Al OESTE de zona centro
+const BASE_POSITION = { x: 15, y: 50 }  // x < 50 = oeste, y = 50 = mismo nivel que centro
 
 const HUMIDITY_COLORS: Record<string, string> = {
   lv0: '#FF3B30',
@@ -85,6 +85,40 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
     }),
     [telemetry.drone.position.latitude, telemetry.drone.position.longitude]
   )
+
+  // Posición mostrada (suavizada) para evitar saltos por ejes cuando las
+  // actualizaciones llegan separadas por lat/lon. `displayPos` interpola
+  // hacia `dronePosition` usando requestAnimationFrame.
+  const [displayPos, setDisplayPos] = useState(dronePosition)
+  const targetPosRef = useRef(dronePosition)
+  const rafRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    targetPosRef.current = dronePosition
+
+    const step = () => {
+      const target = targetPosRef.current
+      setDisplayPos(prev => {
+        const dx = target.x - prev.x
+        const dy = target.y - prev.y
+        const dist = Math.hypot(dx, dy)
+        if (dist < 0.2) {
+          // Cerca suficiente: dejar exactamente la posición objetivo
+          return target
+        }
+        const k = 0.18 // factor de suavizado
+        return { x: prev.x + dx * k, y: prev.y + dy * k }
+      })
+      rafRef.current = requestAnimationFrame(step)
+    }
+
+    if (rafRef.current == null) rafRef.current = requestAnimationFrame(step)
+
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+  }, [dronePosition])
 
   const targetZone = telemetry.drone.targetZone ?? 'centro'
   const targetPosition = useMemo(() => {
@@ -174,8 +208,8 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
     ctx.fillRect(baseX - 6, baseY - 6, 12, 12)
 
     if (telemetry.drone.flightStatus !== 'idle') {
-      const droneX = (dronePosition.x / 100) * rect.width
-      const droneY = (dronePosition.y / 100) * rect.height
+      const droneX = (displayPos.x / 100) * rect.width
+      const droneY = (displayPos.y / 100) * rect.height
       const targetX = (targetPosition.x / 100) * rect.width
       const targetY = (targetPosition.y / 100) * rect.height
 
@@ -259,8 +293,8 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
         <div
           className={`drone-icon ${missionActive ? 'flying' : ''}`}
           style={{
-            left: `${dronePosition.x}%`,
-            top: `${dronePosition.y}%`,
+              left: `${displayPos.x}%`,
+              top: `${displayPos.y}%`,
           }}
           title={`Dron - ${telemetry.drone.flightStatus} - ${telemetry.drone.altitude.toFixed(1)}m`}
         >
@@ -287,9 +321,9 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
         </div>
 
         <div className="map-overlay">
-          <div className="glass-subtle px-3 py-2">
+          <div className="glass-subtle px-3 py-2" style={{ fontSize: '0.8rem' }}>
             <small style={{ color: 'var(--text-secondary)' }}>
-              {missionActive ? `Objetivo: ${targetZone.toUpperCase()}` : 'Esperando misión...'}
+              {missionActive ? `Objetivo: ${targetZone.toUpperCase()}` : 'En espera'}
             </small>
           </div>
         </div>

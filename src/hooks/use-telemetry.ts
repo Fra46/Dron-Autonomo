@@ -61,22 +61,89 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
         // request_status con client_ts, se calcula con el reloj del propio
         // navegador (evita depender de sincronizacion de relojes entre maquinas).
         let latencyUpdate: { pwaLatencyMs: number } | null = null
+        let modeFromServer: 'auto' | 'manual' | null = null
         try {
           const raw = JSON.parse(message)
           if (typeof raw?.pingTs === 'number') {
             latencyUpdate = { pwaLatencyMs: Date.now() - raw.pingTs }
+          }
+          
+          // Solo confiar en el modo del servidor si está explícitamente en el JSON crudo.
+          // Esto evita que telemetrías genéricas reseteen el modo a 'auto'.
+          if (raw?.drone?.mode === 'manual' || raw?.drone?.modo === 'manual') {
+            modeFromServer = 'manual'
+          } else if (raw?.drone?.mode === 'auto' || raw?.drone?.modo === 'auto') {
+            modeFromServer = 'auto'
           }
         } catch {
           // Mensaje no parseable como JSON crudo; parseWSMessage ya maneja ese caso.
         }
 
         if (parsed || latencyUpdate) {
-          setTelemetry(prev => ({
-            ...prev,
-            ...parsed,
-            ...latencyUpdate,
-            lastSync: Date.now(),
-          }))
+          setTelemetry(prev => {
+            const SMOOTH_ALPHA = 0.25 // factor de suavizado para humedad (0..1)
+
+            let merged = {
+              ...prev,
+              ...parsed,
+              ...latencyUpdate,
+              lastSync: Date.now(),
+            }
+
+            // Si el parsed incluye zonas, aplicar suavizado exponencial sobre
+            // la humedad para evitar cambios visuales bruscos.
+            if (parsed?.zones) {
+              const newZones = { ...prev.zones }
+              for (const key of ['norte','centro','sur'] as const) {
+                const prevHum = prev.zones[key].humedad ?? 0
+                const incomingHum = parsed.zones[key]?.humedad ?? prevHum
+                const smoothHum = prevHum + (incomingHum - prevHum) * SMOOTH_ALPHA
+                const estado = parsed.zones[key]?.estado ?? prev.zones[key].estado
+                const temperatura = parsed.zones[key]?.temperatura ?? prev.zones[key].temperatura
+                // Recalcular nivel según humedad suavizada
+                const nivel = (() => {
+                  if (smoothHum < 25) return 'lv0'
+                  if (smoothHum < 40) return 'lv1'
+                  if (smoothHum < 55) return 'lv2'
+                  if (smoothHum < 70) return 'lv3'
+                  if (smoothHum < 85) return 'lv4'
+                  return 'lv5'
+                })()
+
+                newZones[key] = {
+                  humedad: Math.round(smoothHum * 10) / 10,
+                  estado: estado,
+                  temperatura: temperatura,
+                  nivel: nivel as any,
+                }
+              }
+
+              merged = {
+                ...merged,
+                zones: newZones,
+                humidityZones: parsed.humidityZones ?? prev.humidityZones,
+                averageHumidity: typeof parsed.averageHumidity === 'number'
+                  ? parsed.averageHumidity
+                  : (newZones.norte.humedad + newZones.centro.humedad + newZones.sur.humedad) / 3,
+              }
+            }
+
+            // Si el servidor envió explícitamente un valor para el modo, actualizarlo.
+            // Si no lo envió (modeFromServer === null), preservar el modo actual del usuario.
+            if (modeFromServer !== null && merged.drone) {
+              merged.drone = {
+                ...merged.drone,
+                mode: modeFromServer,
+              }
+            } else if (merged.drone) {
+              merged.drone = {
+                ...merged.drone,
+                mode: prev.drone.mode,
+              }
+            }
+
+            return merged
+          })
         }
       },
       onError: (error) => {

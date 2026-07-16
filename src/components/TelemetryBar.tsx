@@ -10,6 +10,15 @@ const FLIGHT_STATUS_LABELS: Record<string, string> = {
   descenso: 'Aterrizando',
 }
 
+const FLIGHT_STATUS_SHORT: Record<string, string> = {
+  idle: 'En',
+  ascenso: 'Sub',
+  navegando: 'Vu',
+  regando: 'Rg',
+  retorno: 'Rt',
+  descenso: 'At',
+}
+
 function getBatteryColor(level: number) {
   if (level > 60) return 'var(--lv3)'
   if (level > 30) return 'var(--lv2)'
@@ -29,19 +38,6 @@ function getSignalColor(signal: number) {
   return 'var(--lv0)'
 }
 
-/**
- * Header principal de la PWA.
- *
- * Antes esto era una barra de telemetria fija (position: fixed) separada del
- * titulo "AgroDron", que vivia como un <h1> centrado mas abajo en App.tsx. En
- * pantallas angostas esa barra no colapsaba a nada: solo se envolvia
- * (flex-wrap), lo que dejaba etiquetas y valores amontonados y cortados.
- *
- * Ahora es un Navbar real de Bootstrap: el nombre de la app vive en la barra
- * superior (Navbar.Brand) junto con un boton hamburguesa (Navbar.Toggle) que
- * en movil colapsa toda la telemetria secundaria en un menu desplegable,
- * dejando visible en todo momento solo lo esencial (marca + estado de vuelo).
- */
 export default function TelemetryBar() {
   const { telemetry, isConnected, connectionError } = useTelemetryContext()
   const missionActive = ['ascenso', 'navegando', 'regando', 'retorno'].includes(telemetry.drone.flightStatus)
@@ -65,21 +61,24 @@ export default function TelemetryBar() {
               Riego autónomo inteligente
             </span>
           </span>
-        </Navbar.Brand>
 
-        <div className="d-flex align-items-center gap-2 order-lg-3">
           <Badge
             bg="dark"
-            className="flight-status-badge"
+            className="flight-status-badge ms-2"
             style={{ border: `1px solid ${missionActive ? 'var(--lv3)' : 'var(--text-muted)'}` }}
           >
             <span
               className={`status-dot ${missionActive ? 'online' : 'offline'}`}
               aria-hidden="true"
             />
-            {FLIGHT_STATUS_LABELS[currentFlightStatus] ?? currentFlightStatus}
+            <span className="flight-status-label">
+              {FLIGHT_STATUS_LABELS[currentFlightStatus] ?? currentFlightStatus}
+            </span>
           </Badge>
-          <Navbar.Toggle aria-controls="main-navbar-telemetry" />
+        </Navbar.Brand>
+
+        <div className="d-flex align-items-center gap-2 order-lg-3">
+          <Navbar.Toggle aria-controls="main-navbar-telemetry" className="navbar-toggle-sm" />
         </div>
 
         <Navbar.Collapse id="main-navbar-telemetry" className="order-lg-2">

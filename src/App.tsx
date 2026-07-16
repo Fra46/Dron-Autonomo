@@ -1,10 +1,11 @@
 import { Container } from 'react-bootstrap'
 import { TelemetryProvider, useTelemetryContext } from '@/contexts/TelemetryContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 import TelemetryBar from './components/TelemetryBar'
 import MapContainer from './components/MapContainer'
-import ScorePanel from './components/ScorePanel'
 import BigScoreSummary from './components/BigScoreSummary'
 import MissionControl from './components/MissionControl'
+import FloatingThemeToggle from './components/FloatingThemeToggle'
 
 function AppContent() {
   const { telemetry } = useTelemetryContext()
@@ -13,6 +14,7 @@ function AppContent() {
   return (
     <div className="app-container">
       <TelemetryBar />
+      <FloatingThemeToggle />
       
       <Container fluid className="main-content">
         <div className="row g-4">
@@ -20,20 +22,22 @@ function AppContent() {
             <div className="fade-up delay-1">
               <MapContainer missionActive={missionActive} />
             </div>
+
+            {/* En móvil: mostrar MissionControl bajo el mapa */}
+            <div className="fade-up delay-3 d-lg-none" style={{ marginTop: '1rem' }}>
+              <MissionControl />
+            </div>
           </div>
-          
+
           <div className="col-lg-4">
             <div className="d-flex flex-column gap-4">
-              <div className="fade-up delay-2">
-                <ScorePanel />
-              </div>
-              
-              <div className="fade-up delay-3">
-                <BigScoreSummary humidity={telemetry.averageHumidity} />
-              </div>
-              
-              <div className="fade-up delay-4">
+              {/* En escritorio: MissionControl arriba de Estado del Suelo */}
+              <div className="fade-up delay-2 d-none d-lg-block">
                 <MissionControl />
+              </div>
+
+              <div className="fade-up delay-2">
+                <BigScoreSummary humidity={telemetry.averageHumidity} />
               </div>
             </div>
           </div>
@@ -45,8 +49,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <TelemetryProvider>
-      <AppContent />
-    </TelemetryProvider>
+    <ThemeProvider>
+      <TelemetryProvider>
+        <AppContent />
+      </TelemetryProvider>
+    </ThemeProvider>
   )
 }

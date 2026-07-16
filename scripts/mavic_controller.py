@@ -308,13 +308,22 @@ robot    = Robot()
 timestep = int(robot.getBasicTimeStep())   # Período de cada paso en milisegundos
 dt_step  = timestep / 1000.0              # Convertido a segundos
 
-# Inicializar los 4 motores del Crazyflie
+# Inicializar los 4 motores del Mavic 2 PRO
 # setPosition(inf) = modo de control por velocidad (no por posición)
-# Las velocidades iniciales ±1.0 son las mismas que en crazyflie.c
+# El orden aquí está elegido para coincidir con la configuración de rotores
+# del PROTO Mavic2Pro y la mezcla de motores usada más abajo.
 motores = []
+# Las velocidades iniciales ±1.0 separan las dos direcciones de giro.
+# Los rotores trasero-izquierdo y delantero-derecho giran en sentido opuesto.
+motor_names = [
+    "rear left propeller",
+    "rear right propeller",
+    "front right propeller",
+    "front left propeller",
+]
 velocidades_iniciales = [-1.0, 1.0, -1.0, 1.0]
-for i, vi in enumerate(velocidades_iniciales, start=1):
-    m = robot.getDevice(f"m{i}_motor")
+for name, vi in zip(motor_names, velocidades_iniciales):
+    m = robot.getDevice(name)
     m.setPosition(float("inf"))   # Habilitar control de velocidad continua
     m.setVelocity(vi)             # Velocidad inicial (para romper inercia)
     motores.append(m)

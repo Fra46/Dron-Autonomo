@@ -37,6 +37,69 @@
   --border-radius-sm: 8px;
 }
 
+/* Tema claro */
+[data-theme="light"] {
+  /* Fondo claro */
+  --bg: #f5f7fa;
+  --bg-card: rgba(255, 255, 255, 0.95);
+  --bg-elevated: rgba(245, 247, 250, 0.9);
+  
+  /* Textos con excelente contraste */
+  --text-primary: #0f1419;
+  --text-secondary: #4a5568;
+  --text-muted: #8a92a6;
+  
+  /* Gradiente principal adaptado */
+  --gradient-start: #FF5E57;
+  --gradient-end: #AF52DE;
+}
+
+/* Fondo gradiente para tema claro */
+[data-theme="light"] body {
+  background: linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%);
+}
+
+/* Ajustar glass effect para tema claro */
+[data-theme="light"] .glass,
+[data-theme="light"] .glass-subtle,
+[data-theme="light"] .glass-border {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .app-navbar {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-bottom-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .flight-status-badge {
+  background-color: rgba(245, 247, 250, 0.6) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Mejorar elementos específicos en modo claro */
+[data-theme="light"] .mission-zone-btn {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .floating-theme-toggle {
+  box-shadow: 0 8px 24px rgba(255, 94, 87, 0.2);
+}
+
+[data-theme="light"] .floating-theme-toggle:hover {
+  box-shadow: 0 12px 32px rgba(255, 94, 87, 0.3);
+}
+
+[data-theme="light"] .telemetry-chip {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .telemetry-chip-label {
+  color: var(--text-secondary);
+}
+
 /* Reset y base */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -82,6 +145,9 @@ body {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  flex-wrap: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .app-brand-icon {
@@ -93,6 +159,17 @@ body {
   display: flex;
   flex-direction: column;
   line-height: 1.15;
+  min-width: 0;
+}
+
+.app-brand-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-status-badge {
+  flex-shrink: 0;
 }
 
 .app-brand-title {
@@ -115,9 +192,27 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.45rem 0.7rem;
-  font-size: 0.75rem;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.72rem;
   white-space: nowrap;
+  min-width: 44px;
+  height: 32px;
+  justify-content: center;
+}
+
+/* Hide the textual label on very small screens to avoid truncating the app title.
+   The label becomes visible on >= sm (576px) where space is more abundant. */
+.flight-status-label-short {
+  display: inline;
+  font-weight: 700;
+}
+
+@media (min-width: 576px) {
+  .flight-status-badge {
+    padding: 0.45rem 0.7rem;
+    min-width: 110px;
+    font-size: 0.75rem;
+  }
 }
 
 /* Fila de "chips" de telemetria: cada dato vive en su propia caja con ancho
@@ -384,6 +479,116 @@ body {
   }
 }
 
+/* Zone Selection Buttons */
+/* Zone selection */
+.zone-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.zone-selection > div {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.mission-zone-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 0.7rem 1.2rem;
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--border-radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+}
+
+.mission-zone-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.mission-zone-btn:hover {
+  border-color: rgba(255, 94, 87, 0.3);
+  background: rgba(255, 94, 87, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255, 94, 87, 0.15);
+}
+
+.mission-zone-btn:hover::before {
+  left: 100%;
+}
+
+.mission-zone-btn.active {
+  border-color: var(--gradient-start);
+  background: linear-gradient(135deg, rgba(255, 94, 87, 0.15), rgba(175, 82, 222, 0.15));
+  box-shadow: 0 0 20px rgba(255, 94, 87, 0.3);
+  color: #fff;
+}
+
+/* Floating Theme Toggle Button - Mobile Only */
+.floating-theme-toggle {
+  position: fixed;
+  bottom: 2rem;
+  left: 2rem;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  border: none;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 8px 24px rgba(255, 94, 87, 0.3);
+  z-index: 999;
+  backdrop-filter: blur(10px);
+  padding: 0;
+}
+
+.floating-theme-toggle:hover {
+  transform: translateY(-4px) scale(1.1);
+  box-shadow: 0 12px 32px rgba(255, 94, 87, 0.4);
+}
+
+.floating-theme-toggle:active {
+  transform: translateY(-2px) scale(0.95);
+}
+
+/* Ocultar en desktop */
+@media (min-width: 993px) {
+  .floating-theme-toggle {
+    display: none;
+  }
+}
+
+/* Ajustar para pantallas muy pequeñas */
+@media (max-width: 576px) {
+  .floating-theme-toggle {
+    width: 48px;
+    height: 48px;
+    font-size: 1.2rem;
+    bottom: 1.5rem;
+    left: 1.5rem;
+  }
+}
+
 /* Status indicators */
 .status-dot {
   width: 8px;
@@ -503,12 +708,50 @@ body {
   .main-content {
     padding-top: 76px;
   }
+  
+  /* En tablet y móvil, mejorar el layout del navbar para evitar que se envuelva */
+  .app-navbar {
+    padding: 0.5rem 0;
+  }
+  
+  .app-brand-subtitle {
+    display: none !important;
+  }
+  
+  .flight-status-badge {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.6rem;
+  }
+}
+
+/* Smaller burger/toggler to avoid layout shifts when badge text changes */
+.navbar-toggle-sm {
+  padding: 0.2rem 0.35rem;
+  width: 44px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+.navbar-toggle-sm .navbar-toggler-icon {
+  background-size: 18px 18px;
+  width: 18px;
+  height: 18px;
+}
+
+@media (min-width: 992px) {
+  .navbar-toggle-sm {
+    width: 44px;
+    height: 36px;
+  }
 }
 
 @media (max-width: 576px) {
   .main-content {
     padding-left: 1rem;
     padding-right: 1rem;
+    padding-top: 70px;
   }
 
   .panel-card {
@@ -520,7 +763,21 @@ body {
   }
 
   .app-brand-title {
-    font-size: 1.1rem;
+    font-size: 1rem;
+  }
+  
+  .app-brand-icon {
+    font-size: 1.3rem;
+  }
+  
+  .telemetry-chip-row {
+    gap: 0.4rem 0.8rem;
+    padding: 0.5rem 0;
+  }
+  
+  .telemetry-chip {
+    min-width: 5rem;
+    font-size: 0.9rem;
   }
 }
 
