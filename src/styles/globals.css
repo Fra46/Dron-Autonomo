@@ -65,28 +65,112 @@ body {
 }
 
 .main-content {
-  padding-top: 100px;
+  padding-top: 84px;
   padding-left: 1.5rem;
   padding-right: 1.5rem;
 }
 
-/* Título principal con gradiente */
-.main-title {
+/* Header / Navbar principal (reemplaza la barra de telemetria fija +
+   el <h1> centrado que vivian por separado) */
+.app-navbar {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.app-brand-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.app-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.app-brand-title {
   font-family: var(--font-heading);
-  font-size: clamp(2.5rem, 8vw, 4rem);
   font-weight: 800;
+  font-size: 1.25rem;
   background: var(--gradient-main);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 0.5rem;
 }
 
-.subtitle {
-  font-family: var(--font-body);
+.app-brand-subtitle {
+  font-size: 0.7rem;
   color: var(--text-secondary);
-  font-size: 1.1rem;
-  font-weight: 400;
+  white-space: nowrap;
+}
+
+.flight-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* Fila de "chips" de telemetria: cada dato vive en su propia caja con ancho
+   minimo, y el contenedor hace flex-wrap. Antes era una unica Row de
+   Bootstrap con columnas de ancho fijo (Col xs/md) que, en pantallas
+   angostas, terminaba envolviendo etiquetas y valores en lineas separadas y
+   cortando palabras como "Latencia PWA↔Bridge". Con min-width + flex-wrap
+   cada chip se mueve como unidad completa a la siguiente linea. */
+.telemetry-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1.1rem;
+  padding: 0.75rem 0;
+}
+
+@media (min-width: 992px) {
+  .telemetry-chip-row {
+    padding: 0;
+  }
+}
+
+.telemetry-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 5.5rem;
+}
+
+.telemetry-chip-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.telemetry-chip-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.telemetry-chip-value {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.telemetry-chip-error {
+  color: var(--lv0);
+  font-size: 0.8rem;
 }
 
 /* Glass effect para cards */
@@ -205,6 +289,59 @@ body {
   box-shadow: 0 0 20px currentColor;
 }
 
+/* Auto/Manual mode toggle (MissionControl) */
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mode-toggle-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.mode-toggle-subtitle {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+  max-width: 30ch;
+}
+
+.mode-switch {
+  flex-shrink: 0;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  background: var(--text-muted);
+  transition: background-color 0.2s ease;
+}
+
+.mode-switch.on {
+  background: var(--lv3);
+}
+
+.mode-switch-thumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s ease;
+}
+
+.mode-switch.on .mode-switch-thumb {
+  transform: translateX(20px);
+}
+
 /* Mission Button */
 .mission-btn {
   width: 100%;
@@ -245,35 +382,6 @@ body {
   50% {
     box-shadow: 0 0 40px rgba(52, 199, 89, 0.6);
   }
-}
-
-/* Telemetry Bar */
-.telemetry-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  padding: 0.75rem 1.5rem;
-}
-
-.telemetry-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.telemetry-label {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.telemetry-value {
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  font-weight: 600;
 }
 
 /* Status indicators */
@@ -393,11 +501,7 @@ body {
 /* Responsive adjustments */
 @media (max-width: 992px) {
   .main-content {
-    padding-top: 120px;
-  }
-  
-  .telemetry-bar {
-    flex-wrap: wrap;
+    padding-top: 76px;
   }
 }
 
@@ -406,13 +510,17 @@ body {
     padding-left: 1rem;
     padding-right: 1rem;
   }
-  
+
   .panel-card {
     padding: 1rem;
   }
-  
+
   .big-score {
     font-size: 1.75rem;
+  }
+
+  .app-brand-title {
+    font-size: 1.1rem;
   }
 }
 

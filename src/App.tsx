@@ -15,11 +15,6 @@ function AppContent() {
       <TelemetryBar />
       
       <Container fluid className="main-content">
-        <header className="text-center fade-up mb-4">
-          <h1 className="main-title">AgroDron</h1>
-          <p className="subtitle">Sistema Autónomo de Riego Inteligente</p>
-        </header>
-
         <div className="row g-4">
           <div className="col-lg-8">
             <div className="fade-up delay-1">

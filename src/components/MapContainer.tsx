@@ -229,16 +229,27 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
             left: `${dronePosition.x}%`,
             top: `${dronePosition.y}%`,
           }}
-          title={`Dron - ${telemetry.drone.flightStatus}`}
+          title={`Dron - ${telemetry.drone.flightStatus} - ${telemetry.drone.altitude.toFixed(1)}m`}
         >
           <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="20" cy="20" r="8" fill="url(#droneGradient)" />
             <defs>
-              <linearGradient id="droneGradient" x1="12" y1="12" x2="28" y2="28">
+              <linearGradient id="droneGradient" x1="6" y1="6" x2="34" y2="34">
                 <stop offset="0%" stopColor="#FF5E57" />
                 <stop offset="100%" stopColor="#AF52DE" />
               </linearGradient>
             </defs>
+            {/* Brazos en cruz, para que se lea como un dron y no como otro
+                punto de humedad identico a los node-marker de las zonas */}
+            <line x1="9" y1="9" x2="31" y2="31" stroke="url(#droneGradient)" strokeWidth="2.5" />
+            <line x1="31" y1="9" x2="9" y2="31" stroke="url(#droneGradient)" strokeWidth="2.5" />
+            {/* 4 rotores en las puntas de los brazos */}
+            <circle cx="9" cy="9" r="5.5" fill="none" stroke="url(#droneGradient)" strokeWidth="2" />
+            <circle cx="31" cy="9" r="5.5" fill="none" stroke="url(#droneGradient)" strokeWidth="2" />
+            <circle cx="9" cy="31" r="5.5" fill="none" stroke="url(#droneGradient)" strokeWidth="2" />
+            <circle cx="31" cy="31" r="5.5" fill="none" stroke="url(#droneGradient)" strokeWidth="2" />
+            {/* Cuerpo central solido, blanco para contrastar contra el
+                gradiente rojo-purpura de las zonas de humedad */}
+            <circle cx="20" cy="20" r="7" fill="url(#droneGradient)" stroke="#fff" strokeWidth="2" />
           </svg>
         </div>
 

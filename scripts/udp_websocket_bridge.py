@@ -61,6 +61,8 @@ drone_state = {
     "targetZone": None,
     "waterLevel": 100.0,
     "speed": 0.0,
+    "altitude": 0.0,
+    "modo": "auto",
 }
 target_position = {"x": 50.0, "y": 80.0, "z": 0.0}
 last_drone_packet_ts: Optional[float] = None
@@ -234,6 +236,10 @@ def procesar_telemetria_dron(datos: dict):
         drone_state["waterLevel"] = float(datos["waterLevel"])
     if "speed" in datos:
         drone_state["speed"] = float(datos["speed"])
+    if "altitude" in datos:
+        drone_state["altitude"] = float(datos["altitude"])
+    if "modo" in datos:
+        drone_state["modo"] = datos["modo"]
     if "targetZone" in datos:
         drone_state["targetZone"] = datos["targetZone"]
     if isinstance(datos.get("position"), dict):
@@ -323,7 +329,7 @@ async def websocket_handler(websocket):
                 await websocket.send(json.dumps(reply))
                 continue
 
-            if cmd_type in ("start_mission", "stop_mission", "emergency_stop"):
+            if cmd_type in ("start_mission", "stop_mission", "emergency_stop", "set_mode"):
                 try:
                     controller_sock.sendto(json.dumps(cmd).encode("utf-8"), (CONTROLLER_HOST, CONTROLLER_CMD_PORT))
                     print(f"[CMD] Reenviado a controlador: {cmd}")

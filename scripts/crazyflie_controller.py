@@ -365,11 +365,30 @@ objetivo_zona  = None               # Nombre de zona objetivo actual (para telem
 timer_riego    = 0.0               # Contador de tiempo de riego acumulado
 height_desired = ALTURA_OBJETIVO   # Altura objetivo dinámica (cambia en descenso)
 
-# Estimaciones simples reportadas como telemetria (no hay sensores reales de
-# bateria/nivel de agua en la simulacion de Webots, se estiman por tiempo de
-# vuelo/riego transcurrido; se documentan aqui para que sea explicito que son
-# estimaciones, no lecturas de hardware).
-bateria_estimada    = 100.0
+# ── MODO DE OPERACION Y COLA DE MISION ───────────────────────────────────────
+# El granjero controla el dron de 2 formas posibles (ver MissionControl.tsx):
+#   "auto"   → el dron riega por su cuenta en cuanto la logica difusa detecta
+#              una zona seca, sin esperar ningun boton. Este es el default.
+#   "manual" → el dron SOLO despega cuando la PWA envia start_mission (boton).
+# En cualquiera de los 2 modos, si al iniciar una mision otras zonas YA
+# conocidas tambien estan secas, se encolan en cola_zonas para visitarlas
+# todas antes de volver a la base (ver avanzar_a_siguiente_zona_o_retorno).
+# Antes no existia esta distincion: la maquina de estados reaccionaba a CADA
+# paquete de humedad que llegaba estando en IDLE sin importar si el granjero
+# habia pedido control manual, y al terminar de regar una zona siempre volvia
+# a la base ignorando cualquier otra zona seca, para luego re-despegar en
+# cuanto aterrizaba y le llegaba el siguiente paquete de esa zona.
+MODO_AUTO   = "auto"
+MODO_MANUAL = "manual"
+modo        = MODO_AUTO
+
+cola_zonas     = []                              # zonas secas pendientes de esta mision
+ultima_humedad = {z: None for z in COORDENADAS_ZONAS}  # cache: ultima lectura conocida por zona
+
+# Nivel de agua estimado (no hay sensor real de tanque en la simulacion de
+# Webots, se estima por tiempo de riego transcurrido). La bateria, en cambio,
+# se reporta fija en 100% (ver enviar_telemetria): es una simulacion, no hay
+# consumo real que estimar, y decrementarla artificialmente solo confundia.
 nivel_agua_estimado = 100.0
 
 # Mapeo de estados internos (mayusculas) al formato que espera la PWA
@@ -384,27 +403,58 @@ ESTADO_A_FRONTEND = {
 }
 
 
+# Anclas (x_metros_real, y_porcentaje_mapa) derivadas de COORDENADAS_ZONAS y
+# ordenadas por X, en vez de constantes hardcodeadas por separado: si alguien
+# cambia COORDENADAS_ZONAS (como paso al ajustar el mundo de Webots), esta
+# proyeccion se actualiza sola. Antes esta funcion tenia sus propios numeros
+# fijos (sur=-1.5, centro=0, norte=1.5) que quedaron desactualizados cuando
+# COORDENADAS_ZONAS cambio a sur=-2.5/centro=1.7/norte=6.0, lo que hacia que
+# CUALQUIER posicion con x cercana a la base (1.65) proyectara como si
+# estuviera en el norte. Ese era el bug de "al volver a la base, el mapa
+# muestra el dron en el norte".
+_ANCLAS_X_PCT = sorted(
+    [
+        (COORDENADAS_ZONAS["sur"][0], 80.0),
+        (COORDENADAS_ZONAS["centro"][0], 50.0),
+        (COORDENADAS_ZONAS["norte"][0], 20.0),
+    ],
+    key=lambda par: par[0],
+)
+
+
 def proyectar_a_porcentaje(x_m: float, y_m: float):
-    """Proyecta una posicion real de Webots (metros) al espacio porcentual
-    0-100 que usa el mapa de la PWA (ver ZONE_LAYOUT en
-    src/components/MapContainer.tsx). Las tres zonas estan alineadas sobre la
-    diagonal x=y en COORDENADAS_ZONAS (sur=[-1.5,-1.5], centro=[0,0],
-    norte=[1.5,1.5]), asi que se parametriza esa diagonal con t en [0,1]
-    (0=sur, 1=norte) y se mapea a y_pct en [80, 20], igual que ZONE_LAYOUT.
+    """Proyecta la coordenada X real de Webots (metros) al eje vertical
+    porcentual 0-100 que usa el mapa de la PWA (ver ZONE_LAYOUT en
+    src/components/MapContainer.tsx: sur=80%, centro=50%, norte=20%, todas en
+    x=50%). Interpola linealmente entre las anclas conocidas y extrapola
+    (recortando a [0,100]) para posiciones fuera de ese rango, como la base.
+    NOTA: esto solo posiciona el icono en el mapa 2D simplificado de la PWA;
+    la altitud real (metros) se envia por separado en enviar_telemetria, no
+    se deriva de aqui.
     """
-    t = (x_m + 1.5) / 3.0
-    t = max(0.0, min(1.0, t))
-    y_pct = 80.0 - 60.0 * t
+    for (x0, y0), (x1, y1) in zip(_ANCLAS_X_PCT, _ANCLAS_X_PCT[1:]):
+        if x0 <= x_m <= x1:
+            t = 0.0 if x1 == x0 else (x_m - x0) / (x1 - x0)
+            return {"x": 50.0, "y": y0 + t * (y1 - y0), "z": 0.0}
+
+    if x_m < _ANCLAS_X_PCT[0][0]:
+        (x0, y0), (x1, y1) = _ANCLAS_X_PCT[0], _ANCLAS_X_PCT[1]
+    else:
+        (x0, y0), (x1, y1) = _ANCLAS_X_PCT[-2], _ANCLAS_X_PCT[-1]
+    t = (x_m - x0) / (x1 - x0)
+    y_pct = max(0.0, min(100.0, y0 + t * (y1 - y0)))
     return {"x": 50.0, "y": y_pct, "z": 0.0}
 
 
 def enviar_telemetria(x_global, y_global, actual_altitude, speed_mps):
     """Construye y envia un paquete de telemetria real del dron hacia el
     bridge (ver procesar_telemetria_dron en udp_websocket_bridge.py)."""
-    global bateria_estimada, nivel_agua_estimado
+    global nivel_agua_estimado
 
-    if estado != IDLE:
-        bateria_estimada = max(0.0, bateria_estimada - 0.02)
+    # Bateria fija al 100%: esta es una simulacion en Webots, no hay una
+    # bateria fisica que se consuma, asi que no tiene sentido decrementarla
+    # (antes bajaba 0.02%/tick en cada paso de vuelo sin motivo real).
+    bateria_reportada = 100.0
     if estado == REGANDO:
         nivel_agua_estimado = max(0.0, nivel_agua_estimado - 0.5)
 
@@ -413,11 +463,18 @@ def enviar_telemetria(x_global, y_global, actual_altitude, speed_mps):
     paquete = {
         "type": "drone_telemetry",
         "flightStatus": ESTADO_A_FRONTEND.get(estado, "idle"),
-        "battery": round(bateria_estimada, 1),
+        "battery": bateria_reportada,
         "waterLevel": round(nivel_agua_estimado, 1),
         "speed": round(speed_mps, 3),
         "targetZone": objetivo_zona,
         "position": proyectar_a_porcentaje(x_global, y_global),
+        # Altitud real en metros (independiente del "z" de arriba, que es
+        # siempre 0 porque el mapa de la PWA es 2D). Antes no se enviaba
+        # ningun campo separado para esto, asi que el frontend leia
+        # drone.position.altitude (=el "z" del mapa, siempre 0) y por eso la
+        # altitud nunca se actualizaba en la barra de telemetria.
+        "altitude": round(actual_altitude, 2),
+        "modo": modo,
     }
     if target_pct is not None:
         paquete["targetPosition"] = target_pct
@@ -426,6 +483,28 @@ def enviar_telemetria(x_global, y_global, actual_altitude, speed_mps):
         telemetry_sock.sendto(json.dumps(paquete).encode("utf-8"), (BRIDGE_HOST, BRIDGE_TELEMETRY_PORT))
     except Exception as exc:
         print(f"  No se pudo enviar telemetria al bridge: {exc}")
+
+
+def avanzar_a_siguiente_zona_o_retorno(motivo: str):
+    """Al terminar de regar una zona, revisa si quedan otras zonas secas
+    pendientes en la cola de esta mision y navega hacia la siguiente en vez
+    de volver a la base e ignorarlas (el dron aterrizaba, y recien ENTONCES
+    detectaba la siguiente zona seca y volvia a despegar). Solo si la cola
+    esta vacia se inicia el RETORNO real."""
+    global objetivo_zona, objetivo_xy, estado, timer_riego, cola_zonas
+
+    if cola_zonas:
+        objetivo_zona = cola_zonas.pop(0)
+        objetivo_xy = COORDENADAS_ZONAS.get(objetivo_zona, [0.0, 0.0])
+        timer_riego = 0.0
+        estado = NAVEGANDO
+        print(f"  {motivo} Zonas pendientes en cola: siguiente → {objetivo_zona.upper()} "
+              f"(quedan {len(cola_zonas)} despues de esta).")
+    else:
+        objetivo_xy = BASE_XY.copy()
+        objetivo_zona = None
+        estado = RETORNO
+        print(f"  {motivo} No quedan zonas pendientes. Iniciando RETORNO.")
 
 
 
@@ -453,54 +532,86 @@ while robot.step(timestep) != -1:
         tipo    = datos.get("type")
 
         if tipo == "start_mission":
-            # Comando explícito de la PWA: fuerza el despegue hacia la zona
-            # indicada, sin esperar a que la lógica difusa lo active.
+            # Comando explícito de la PWA (boton "Iniciar mision", modo
+            # manual o auto): fuerza el despegue hacia la zona indicada, sin
+            # esperar a que la lógica difusa lo active. Tambien encola
+            # cualquier OTRA zona que, segun la ultima lectura conocida, siga
+            # seca, para que la mision las atienda todas antes de volver.
             zona = datos.get("target_zone", "sur")
             if estado == IDLE:
                 objetivo_zona  = zona
                 objetivo_xy    = COORDENADAS_ZONAS.get(zona, [0.0, 0.0])
+                cola_zonas     = [
+                    z for z, h in ultima_humedad.items()
+                    if z != zona and h is not None and requiere_riego(h)
+                ]
                 height_desired = ALTURA_OBJETIVO
                 estado         = ASCENSO
-                print(f"  [PWA] start_mission → zona {zona.upper()}. Iniciando ASCENSO.")
+                print(f"  [PWA] start_mission → zona {zona.upper()} "
+                      f"(cola: {cola_zonas or 'ninguna'}). Iniciando ASCENSO.")
 
         elif tipo == "stop_mission":
             if estado in (ASCENSO, NAVEGANDO, REGANDO):
                 print("  [PWA] stop_mission → iniciando RETORNO.")
+                cola_zonas  = []
                 objetivo_xy = BASE_XY.copy()
+                objetivo_zona = None
                 estado      = RETORNO
 
         elif tipo == "emergency_stop":
             if estado != IDLE:
                 print("  [PWA] emergency_stop → DESCENSO inmediato.")
+                cola_zonas = []
                 estado = DESCENSO
+
+        elif tipo == "set_mode":
+            # Alterna entre riego 100% autonomo ("auto") y solo-por-boton
+            # ("manual"). No interrumpe una mision en curso, solo cambia como
+            # reacciona el dron la proxima vez que este en IDLE.
+            nuevo_modo = datos.get("modo")
+            if nuevo_modo in (MODO_AUTO, MODO_MANUAL) and nuevo_modo != modo:
+                modo = nuevo_modo
+                print(f"  [PWA] Modo cambiado a {modo.upper()}")
 
         elif "zona" in datos and "humedad" in datos:
             # Lectura de suelo reenviada por el bridge (sensor_nasa.py / sensor_mock.py)
             humedad = float(datos["humedad"])
             zona    = datos.get("zona", "centro")
+            ultima_humedad[zona] = humedad
 
-            print(f"  UDP recibido → Zona: {zona.upper()} | "
-                  f"Humedad: {humedad:.1f}% | Estado actual: {estado}")
+            # Solo se imprime cuando el dron esta parado evaluando si debe
+            # despegar (o cuando efectivamente decide hacerlo). Antes se
+            # imprimia una linea por CADA paquete de humedad sin importar el
+            # estado, lo que inundaba la consola incluso a mitad de una
+            # mision con lecturas de zonas que no le interesaban en ese
+            # momento al dron.
+            if estado == IDLE:
+                print(f"  Zona {zona.upper()}: {humedad:.1f}% | IDLE, modo {modo.upper()}")
 
             # Reaccionar al paquete según el estado actual del dron
             if estado == IDLE:
-                # Si está en tierra y la humedad es crítica → despegar hacia esa zona
-                if requiere_riego(humedad):
+                # Solo despega por su cuenta en modo AUTO. En modo MANUAL se
+                # limita a actualizar ultima_humedad y esperar el boton.
+                if modo == MODO_AUTO and requiere_riego(humedad):
                     objetivo_zona  = zona
                     objetivo_xy    = COORDENADAS_ZONAS.get(zona, [0.0, 0.0])
+                    cola_zonas     = [
+                        z for z, h in ultima_humedad.items()
+                        if z != zona and h is not None and requiere_riego(h)
+                    ]
                     height_desired = ALTURA_OBJETIVO
                     estado         = ASCENSO
-                    print(f"  Riego requerido en {zona.upper()}. "
-                          f"Iniciando ASCENSO → objetivo {objetivo_xy}")
+                    print(f"  [AUTO] Riego requerido en {zona.upper()}. "
+                          f"Iniciando ASCENSO → objetivo {objetivo_xy} "
+                          f"(cola: {cola_zonas or 'ninguna'})")
 
             elif estado == REGANDO:
                 # Si ya está regando y la humedad de la ZONA OBJETIVO (no de
                 # cualquier otra zona que llegue en la ronda del sensor) se
-                # normalizó → volver a casa.
+                # normalizó → pasar a la siguiente zona pendiente (si hay) o
+                # volver a casa.
                 if zona == objetivo_zona and not requiere_riego(humedad):
-                    print(f"  Zona {zona.upper()} ya no requiere riego. Iniciando RETORNO.")
-                    objetivo_xy = BASE_XY.copy()
-                    estado      = RETORNO
+                    avanzar_a_siguiente_zona_o_retorno(f"Zona {zona.upper()} ya no requiere riego.")
 
     except BlockingIOError:
         # No hay paquete UDP disponible en este paso → continuar normalmente
@@ -590,10 +701,9 @@ while robot.step(timestep) != -1:
             # Acumular tiempo de riego
             timer_riego += dt
             if timer_riego >= TIEMPO_RIEGO_S:
-                # Tiempo de riego completado → iniciar regreso a base
-                print(f"  Riego completado ({TIEMPO_RIEGO_S}s). Iniciando RETORNO")
-                objetivo_xy = BASE_XY.copy()   # La base está en el origen [0, 0]
-                estado      = RETORNO
+                # Tiempo de riego completado en esta zona → pasar a la
+                # siguiente zona pendiente en cola, si hay, o volver a base.
+                avanzar_a_siguiente_zona_o_retorno(f"Riego completado ({TIEMPO_RIEGO_S}s) en {objetivo_zona.upper()}.")
 
         # ── RETORNO: Volar de vuelta al punto de despegue [0, 0] ─────────────
         elif estado == RETORNO:
@@ -669,13 +779,4 @@ while robot.step(timestep) != -1:
     if current_time - last_telemetry_sent >= TELEMETRY_INTERVAL_S:
         speed_mps = math.sqrt(vx_global ** 2 + vy_global ** 2)
         enviar_telemetria(x_global, y_global, actual_altitude, speed_mps)
-        last_telemetry_sent = current_time
-
-
-    # ── E. ENVIAR TELEMETRIA REAL AL BRIDGE ──────────────────────────────────
-    # Se limita a ~1 Hz (TELEMETRY_INTERVAL_S) para no saturar el enlace y
-    # mantener la misma cadencia nominal que el resto del pipeline (paper: "1 Hz nominal").
-    if current_time - last_telemetry_sent >= TELEMETRY_INTERVAL_S:
-        velocidad_suelo = math.sqrt(vx_global ** 2 + vy_global ** 2)
-        enviar_telemetria(x_global, y_global, actual_altitude, velocidad_suelo)
         last_telemetry_sent = current_time

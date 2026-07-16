@@ -10,7 +10,7 @@ const ZONE_LABELS: Record<MissionZone, string> = {
 }
 
 export default function MissionControl() {
-  const { telemetry, startMission, stopMission, emergencyStop, requestStatus } = useTelemetryContext()
+  const { telemetry, startMission, stopMission, emergencyStop, requestStatus, setMode } = useTelemetryContext()
   const [selectedZone, setSelectedZone] = useState<MissionZone>('sur')
   const [syncing, setSyncing] = useState(false)
   const rawTargetZone = telemetry.drone.targetZone
@@ -23,6 +23,7 @@ export default function MissionControl() {
   const isReturning = status === 'retorno'
   const missionActive = ['ascenso', 'navegando', 'regando', 'retorno'].includes(status)
   const canStop = ['ascenso', 'navegando', 'regando'].includes(status)
+  const isAuto = telemetry.drone.mode === 'auto'
 
   const buttonLabel = isReturning
     ? 'Regresando a base...'
@@ -34,7 +35,32 @@ export default function MissionControl() {
     <div className="glass panel-card">
       <h3 className="panel-title">Control de Misión</h3>
 
-      {!missionActive && (
+      {/* Modo de operacion: 2 formas de controlar el dron.
+          - AUTO: el dron riega por su cuenta en cuanto detecta suelo seco,
+            sin esperar ningun boton, hasta que se desactive este modo.
+          - MANUAL: el dron solo despega cuando el granjero presiona el boton
+            de mision de abajo. */}
+      <div className="mode-toggle mb-3">
+        <div>
+          <div className="mode-toggle-title">Modo automático</div>
+          <div className="mode-toggle-subtitle">
+            {isAuto
+              ? 'El dron riega por su cuenta cualquier zona seca que detecte.'
+              : 'El dron solo actúa cuando presionas "Iniciar misión".'}
+          </div>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isAuto}
+          className={`mode-switch ${isAuto ? 'on' : 'off'}`}
+          onClick={() => setMode(isAuto ? 'manual' : 'auto')}
+        >
+          <span className="mode-switch-thumb" />
+        </button>
+      </div>
+
+      {!isAuto && !missionActive && (
         <div className="zone-selection mb-3">
           <small className="text-secondary">Selecciona una zona objetivo</small>
           <div className="d-flex gap-2 flex-wrap mt-2">
@@ -52,28 +78,30 @@ export default function MissionControl() {
         </div>
       )}
 
-      <button
-        className={`mission-btn ${missionActive ? 'active' : ''}`}
-        disabled={isReturning}
-        onClick={() => {
-          if (!missionActive) {
-            startMission(selectedZone)
-          } else if (canStop) {
-            stopMission()
-          }
-        }}
-      >
-        <span style={{ marginRight: '0.5rem' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            {missionActive ? (
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            ) : (
-              <polygon points="5,3 19,12 5,21" />
-            )}
-          </svg>
-        </span>
-        {buttonLabel}
-      </button>
+      {!isAuto && (
+        <button
+          className={`mission-btn ${missionActive ? 'active' : ''}`}
+          disabled={isReturning}
+          onClick={() => {
+            if (!missionActive) {
+              startMission(selectedZone)
+            } else if (canStop) {
+              stopMission()
+            }
+          }}
+        >
+          <span style={{ marginRight: '0.5rem' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              {missionActive ? (
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              ) : (
+                <polygon points="5,3 19,12 5,21" />
+              )}
+            </svg>
+          </span>
+          {buttonLabel}
+        </button>
+      )}
 
       {missionActive && (
         <button
@@ -125,7 +153,9 @@ export default function MissionControl() {
             fontStyle: 'italic',
           }}
         >
-          El dron despegará, regará la zona seleccionada y regresará a base.
+          {isAuto
+            ? 'En espera: despegará solo en cuanto una zona baje de humedad.'
+            : 'El dron despegará, regará la zona seleccionada y regresará a base.'}
         </p>
       )}
 

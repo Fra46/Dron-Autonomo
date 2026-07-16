@@ -112,20 +112,27 @@ toma la lógica difusa del controlador, ver más abajo — no un umbral fijo aqu
 {
   "type": "drone_telemetry",
   "flightStatus": "navegando",
-  "battery": 87.4,
+  "battery": 100.0,
   "waterLevel": 96.0,
   "speed": 0.42,
   "targetZone": "sur",
-  "position": {"x": 50.0, "y": 65.0, "z": 1.0},
-  "targetPosition": {"x": 50.0, "y": 80.0, "z": 0.0}
+  "position": {"x": 50.0, "y": 65.0, "z": 0.0},
+  "targetPosition": {"x": 50.0, "y": 80.0, "z": 0.0},
+  "altitude": 1.97,
+  "modo": "auto"
 }
 ```
 
 `position`/`targetPosition` ya vienen proyectadas al espacio porcentual 0-100
 que usa el mapa de la PWA (`ZONE_LAYOUT` en `MapContainer.tsx`), no en metros
-de Webots — ver `proyectar_a_porcentaje()` en `crazyflie_controller.py`.
-`battery` y `waterLevel` son **estimaciones** por tiempo transcurrido de vuelo
-y riego (Webots no expone sensores reales de batería/nivel de agua).
+de Webots — ver `proyectar_a_porcentaje()` en `crazyflie_controller.py`. Su
+campo `z` siempre es `0.0` (el mapa es 2D); la altitud real en metros viaja
+por separado en el campo `altitude` de nivel superior.
+`battery` se reporta fija en 100% (es una simulación en Webots, no hay batería
+física que consumir). `waterLevel` sí es una **estimación** por tiempo
+transcurrido de riego (Webots no expone un sensor real de nivel de tanque).
+`modo` refleja si el controlador está en `"auto"` (riega por su cuenta) o
+`"manual"` (solo por botón — ver sección "Modo de operación" más abajo).
 
 ### Salida WebSocket del bridge → PWA (snapshot agregado)
 
@@ -141,13 +148,15 @@ y riego (Webots no expone sensores reales de batería/nivel de agua).
   "averageHumidity": 50,
   "drone": {
     "flightStatus": "navegando",
-    "battery": 87.4,
-    "position": {"x": 50.0, "y": 65.0, "z": 1.0},
+    "battery": 100.0,
+    "position": {"x": 50.0, "y": 65.0, "z": 0.0},
     "targetZone": "sur",
     "waterLevel": 96.0,
-    "speed": 0.42
+    "speed": 0.42,
+    "altitude": 1.97,
+    "modo": "auto"
   },
-  "coordinates": {"x": 50.0, "y": 65.0, "z": 1.0},
+  "coordinates": {"x": 50.0, "y": 65.0, "z": 0.0},
   "targetPosition": {"x": 50.0, "y": 80.0, "z": 0.0},
   "signal": 100.0,
   "temperature": 35,
@@ -192,19 +201,38 @@ Esta escala es independiente de la lógica difusa de activación de riego (abajo
 
 ```python
 COORDENADAS_ZONAS = {
-    "norte":  [ 1.5,  1.5],   # Sector típicamente más húmedo
-    "centro": [ 0.0,  0.0],   # Base del dron
-    "sur":    [-1.5, -1.5],   # Sector típicamente más seco
+    "norte":  [ 6.0, 2.9],   # Sector típicamente más húmedo
+    "centro": [ 1.7, 2.9],
+    "sur":    [-2.5, 2.9],   # Sector típicamente más seco
 }
+BASE_XY = [1.65, 6.32]
 
-ALTURA_OBJETIVO = 1.0    # Metros
+ALTURA_OBJETIVO = 2.0    # Metros
 TOLERANCIA_XY   = 0.15   # Metros
-TIEMPO_RIEGO_S  = 10.0   # Segundos
+TIEMPO_RIEGO_S  = 20.0   # Segundos
 ```
 
-Las tres zonas están alineadas sobre la diagonal `x=y`; `proyectar_a_porcentaje()`
-en `crazyflie_controller.py` usa ese hecho para mapear la posición real del
-dron al espacio 0-100 que dibuja la PWA.
+Las tres zonas comparten la misma `y` real (2.9) y solo varían en `x`;
+`proyectar_a_porcentaje()` en `crazyflie_controller.py` interpola linealmente
+la `x` real del dron contra esas tres anclas (`sur→80%`, `centro→50%`,
+`norte→20%` en el eje vertical del mapa) y recorta el resultado a `[0,100]`
+para posiciones fuera de rango, como la base — así, si alguien reajusta estas
+coordenadas para el mundo de Webots, el mapa de la PWA se sigue viendo
+correcto sin tocar la fórmula.
+
+## Modo de operación y misiones multi-zona
+
+El controlador tiene 2 modos, elegibles desde el switch en `MissionControl.tsx`
+(comando `set_mode`):
+
+- **`auto`** (por defecto): en cuanto la lógica difusa detecta una zona seca
+  y el dron está en `IDLE`, despega solo, sin esperar ningún botón.
+- **`manual`**: el dron solo despega cuando la PWA envía `start_mission`.
+
+En cualquiera de los 2 modos, si al iniciar una misión *otras* zonas ya
+conocidas también están secas, se encolan (`cola_zonas`) y el dron las visita
+todas antes de volver a la base — en vez de aterrizar e ignorarlas hasta que
+llegue la siguiente lectura de esa zona y tenga que volver a despegar.
 
 ## Lógica Difusa del Controlador (igual que el paper, ecuaciones 1-3)
 
@@ -232,10 +260,12 @@ responde directamente sin tocar el controlador):
 {"type": "stop_mission"}
 {"type": "emergency_stop"}
 {"type": "request_status", "client_ts": 1784112707551}
+{"type": "set_mode", "modo": "manual"}
 ```
 
-Los cuatro están expuestos en la UI de `MissionControl.tsx` ("Iniciar misión",
-"Detener Misión", "Parada de emergencia", "Sincronizar estado").
+Los cinco están expuestos en la UI de `MissionControl.tsx` ("Iniciar misión",
+"Detener Misión", "Parada de emergencia", "Sincronizar estado", y el switch
+"Modo automático").
 
 ## Latencia en vivo en la PWA (panel "Latencia PWA↔Bridge")
 

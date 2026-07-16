@@ -17,12 +17,20 @@ export interface ZoneData {
   nivel: HumidityLevel
 }
 
+export type OperationMode = 'auto' | 'manual'
+
 export interface DroneState {
   flightStatus: FlightStatus
   battery: number
   position: Coordinates
   targetZone: string | null
   waterLevel: number
+  // Altitud real en metros reportada por el controlador (independiente de
+  // `position.altitude`, que en realidad es el eje Z=0 del mapa 2D de la
+  // PWA). Antes la barra de telemetria leia position.altitude y por eso
+  // nunca se actualizaba: ese campo siempre llegaba en 0.
+  altitude: number
+  mode: OperationMode
 }
 
 export interface TelemetryNodeReading {
@@ -99,6 +107,8 @@ export const DEFAULT_TELEMETRY: TelemetryData = {
     position: DEFAULT_COORDINATES,
     targetZone: null,
     waterLevel: 100,
+    altitude: 0,
+    mode: 'auto',
   },
   lastReading: null,
   history: [],
@@ -163,6 +173,8 @@ const normalizeDroneState = (raw: any): DroneState => ({
   },
   targetZone: raw?.targetZone ?? raw?.target_zone ?? null,
   waterLevel: typeof raw?.waterLevel === 'number' ? raw.waterLevel : raw?.water_level ?? 100,
+  altitude: typeof raw?.altitude === 'number' ? raw.altitude : 0,
+  mode: raw?.modo === 'manual' || raw?.mode === 'manual' ? 'manual' : 'auto',
 })
 
 const normalizeCoordinates = (raw: any): Coordinates => ({
