@@ -12,6 +12,7 @@ interface TelemetryContextType {
   stopMission: () => void
   emergencyStop: () => void
   requestStatus: () => void
+  setMode: (mode: 'auto' | 'manual') => void
   reconnect: () => void
 }
 
@@ -20,7 +21,7 @@ const TelemetryContext = createContext<TelemetryContextType | null>(null)
 export function TelemetryProvider({ children }: { children: ReactNode }) {
   console.log('[TelemetryProvider] Inicializando...')
   const telemetryState = useTelemetry({
-    wsUrl: typeof window !== 'undefined' ? 'ws://localhost:8765' : '',
+    wsUrl: typeof window !== 'undefined' ? `ws://${window.location.hostname}:8765` : '',
   })
 
   return (

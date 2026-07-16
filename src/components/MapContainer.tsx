@@ -21,6 +21,9 @@ const ZONE_LAYOUT: Record<ZoneNode['id'], { x: number; y: number }> = {
   sur: { x: 50, y: 80 },
 }
 
+// Posición de la base (agrícola)
+const BASE_POSITION = { x: 20, y: 90 }  // Ajusta según tu ubicación real
+
 const HUMIDITY_COLORS: Record<string, string> = {
   lv0: '#FF3B30',
   lv1: '#FF9500',
@@ -156,6 +159,20 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
       ctx.stroke()
     })
 
+    // Dibujar marcador de base
+    const baseX = (BASE_POSITION.x / 100) * rect.width
+    const baseY = (BASE_POSITION.y / 100) * rect.height
+    ctx.strokeStyle = '#34C759'
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    ctx.arc(baseX, baseY, 20, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.fillStyle = 'rgba(52, 199, 89, 0.15)'
+    ctx.fill()
+    // Símbolo de base (pequeño cuadrado en el centro)
+    ctx.fillStyle = '#34C759'
+    ctx.fillRect(baseX - 6, baseY - 6, 12, 12)
+
     if (telemetry.drone.flightStatus !== 'idle') {
       const droneX = (dronePosition.x / 100) * rect.width
       const droneY = (dronePosition.y / 100) * rect.height
@@ -222,6 +239,22 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
             {zone.label}
           </div>
         ))}
+
+        {/* Marcador de base */}
+        <div
+          className="node-marker"
+          style={{
+            left: `${BASE_POSITION.x}%`,
+            top: `${BASE_POSITION.y}%`,
+            backgroundColor: '#34C759',
+            border: '2px solid #34C759',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+          }}
+          title="Base de despegue/aterrizaje"
+        >
+          BASE
+        </div>
 
         <div
           className={`drone-icon ${missionActive ? 'flying' : ''}`}

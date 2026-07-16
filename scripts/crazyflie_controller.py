@@ -89,8 +89,12 @@ THRUST_BASE = 47.0
 #                  = 0          si h >= 35
 #   activa riego si mu_dry(h) + mu_very_dry(h) > theta, theta = 0.65
 # (theta calibrado empiricamente en el paper, seccion 2.3)
+#
+# AJUSTE: Se redujo theta de 0.65 a 0.45 para incluir riego en humedad media,
+# permitiendo que el dron riegue cuando la humedad está en nivel "medio" (lv2, ~40-55%)
+# además de cuando está "seco" (lv0-lv1, <40%).
 
-UMBRAL_ACTIVACION = 0.65  # theta, calibrado en el paper (Tabla 2)
+UMBRAL_ACTIVACION = 0.45  # Reducido para incluir humedad media (era 0.65)
 
 def mu_dry(h):
     """Funcion de membresia difusa para 'suelo SECO' (ecuacion 1 del paper)."""
@@ -490,7 +494,11 @@ def avanzar_a_siguiente_zona_o_retorno(motivo: str):
     pendientes en la cola de esta mision y navega hacia la siguiente en vez
     de volver a la base e ignorarlas (el dron aterrizaba, y recien ENTONCES
     detectaba la siguiente zona seca y volvia a despegar). Solo si la cola
-    esta vacia se inicia el RETORNO real."""
+    esta vacia se inicia el RETORNO real.
+    
+    MEJORA: Después de cada riego, se re-evalúan TODAS las zonas para detectar
+    si alguna se ha vuelto seca durante la misión, no solo se consulta la cola
+    inicial."""
     global objetivo_zona, objetivo_xy, estado, timer_riego, cola_zonas
 
     if cola_zonas:
@@ -501,9 +509,27 @@ def avanzar_a_siguiente_zona_o_retorno(motivo: str):
         print(f"  {motivo} Zonas pendientes en cola: siguiente → {objetivo_zona.upper()} "
               f"(quedan {len(cola_zonas)} despues de esta).")
     else:
-        objetivo_xy = BASE_XY.copy()
-        objetivo_zona = None
-        estado = RETORNO
+        # Re-evaluar TODAS las zonas antes de retornar, en caso de que alguna
+        # se haya vuelto seca durante el riego de las otras zonas
+        zonas_secas_nuevas = [
+            z for z, h in ultima_humedad.items()
+            if h is not None and requiere_riego(h)
+        ]
+        
+        if zonas_secas_nuevas:
+            # Hay zonas que requieren riego → continuar con la misión
+            objetivo_zona = zonas_secas_nuevas[0]
+            objetivo_xy = COORDENADAS_ZONAS.get(objetivo_zona, [0.0, 0.0])
+            cola_zonas = zonas_secas_nuevas[1:]  # Resto en cola
+            timer_riego = 0.0
+            estado = NAVEGANDO
+            print(f"  {motivo} Nuevas zonas secas detectadas: {objetivo_zona.upper()} "
+                  f"(cola: {cola_zonas or 'ninguna'})")
+        else:
+            # Verdaderamente no hay más zonas que rieguen → retornar a base
+            objetivo_xy = BASE_XY.copy()
+            objetivo_zona = None
+            estado = RETORNO
         print(f"  {motivo} No quedan zonas pendientes. Iniciando RETORNO.")
 
 

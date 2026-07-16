@@ -166,6 +166,14 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
     sendCommand({ type: 'request_status', client_ts: Date.now() })
   }, [sendCommand])
 
+  const setMode = useCallback((mode: 'auto' | 'manual') => {
+    sendCommand({ type: 'set_mode', mode })
+    setTelemetry(prev => ({
+      ...prev,
+      drone: { ...prev.drone, mode },
+    }))
+  }, [sendCommand])
+
   // Initialize
   useEffect(() => {
     console.log('[Telemetry] useEffect ejecutado')
@@ -204,6 +212,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
     stopMission,
     emergencyStop,
     requestStatus,
+    setMode,
     reconnect: connect,
   }
 }
