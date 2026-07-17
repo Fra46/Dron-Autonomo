@@ -1,6 +1,6 @@
 {
-  "name": "AgroDrone - Sistema de Riego Autónomo",
-  "short_name": "AgroDrone",
+  "name": "AgroDron - Sistema de Riego Autónomo",
+  "short_name": "AgroDron",
   "description": "Sistema de control para dron autónomo de riego de cultivos agrícolas",
   "start_url": "/",
   "display": "standalone",

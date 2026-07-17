@@ -56,7 +56,7 @@ export default function TelemetryBar() {
         <Navbar.Brand href="#" className="app-brand">
           <span className="app-brand-icon" aria-hidden="true">🚁</span>
           <span className="app-brand-text">
-            <span className="app-brand-title">AgroDrone</span>
+            <span className="app-brand-title">AgroDron</span>
             <span className="app-brand-subtitle d-none d-sm-inline">
               Riego autónomo inteligente
             </span>
