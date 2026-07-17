@@ -9,6 +9,7 @@ import socket
 import json                        
 import math                        
 import time                        
+import random                      # Para la dispersion horizontal de las gotas de agua
 
 # ── 1. CONFIGURACIÓN DE RED ──────────────────────────────────────────────────
 UDP_IP   = "0.0.0.0"
@@ -35,10 +36,17 @@ COORDENADAS_ZONAS = {
 
 BASE_XY = [1.65, 6.32]
 
+# Distancia maxima permitida desde la base antes de forzar un aterrizaje de
+# emergencia. Las zonas mas lejanas estan a ~5.5m de la base, asi que 15m da
+# margen de sobra para navegar sin arriesgarse a perder el dron fuera del mapa.
+RADIO_SEGURO_M = 15.0
+
 # ── 3. GANANCIAS PID (Sintonizadas para DJI Mavic 2 PRO) ──────────────────────
 
-K_ROLL_P = 50.0
-K_PITCH_P = 30.0
+K_ROLL_P = 6.0
+K_PITCH_P = 5.0
+K_ROLL_D = 1.0
+K_PITCH_D = 1.0
 KP_Z = 2.8
 KD_Z = 1.2
 THRUST_BASE = 68.5
@@ -120,6 +128,97 @@ telemetry_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 telemetry_sock.setblocking(False)
 last_telemetry_sent = 0.0
 
+# ── 7bis. SISTEMA VISUAL DE GOTAS DE AGUA (efecto de riego) ──────────────────
+# 10 esferas DEF'd en el .wbt (GOTA_0 .. GOTA_9), sin fisica, que este
+# Supervisor mueve directamente por su campo "translation" para simular un
+# chorro de gotas cayendo en cascada mientras el dron esta REGANDO.
+#
+# Simplificacion de coordenadas: en este mundo, gps_vals[2] (lo que el resto
+# del controlador ya llama "actual_altitude") es directamente la coordenada Z
+# global del dron, y el suelo esta en Z ~ 0 (ver traslacion inicial del
+# Mavic2Pro en el .wbt, -0.084). Por eso una gota que nace en Z=altura y cae
+# "altura" metros llega justo al suelo bajo el dron - no hace falta conocer
+# la altura real del terreno en cada punto.
+N_GOTAS = 10
+GOTA_G = 9.8                  # "gravedad" visual de la caida (m/s^2)
+GOTA_JITTER_XY = 0.18         # dispersion horizontal aleatoria al nacer (m)
+GOTA_PARK_Z = -50.0           # posicion cuando no se esta regando (fuera de vista)
+
+gota_fields = []
+for _i in range(N_GOTAS):
+    _nodo_gota = robot.getFromDef(f"GOTA_{_i}")
+    if _nodo_gota is None:
+        print(f"  ADVERTENCIA: no se encontro el nodo DEF GOTA_{_i} en el .wbt. "
+              f"Esa gota no se movera (revisa el mundo).")
+        gota_fields.append(None)
+    else:
+        gota_fields.append(_nodo_gota.getField("translation"))
+
+gota_t = [0.0] * N_GOTAS              # tiempo transcurrido desde que "nacio" cada gota
+gota_origen = [[0.0, 0.0, 0.0] for _ in range(N_GOTAS)]   # punto (x,y,z) de nacimiento
+gotas_activas = False                  # evita reaparcar/reiniciar en cada paso sin regar
+
+
+def _nacer_gota(indice, x, y, z):
+    """(Re)inicia una gota en la posicion del dron, con un pequeño offset
+    horizontal aleatorio para que el chorro se vea como varias gotas y no
+    una sola linea perfecta."""
+    gota_t[indice] = 0.0
+    gota_origen[indice] = [
+        x + random.uniform(-GOTA_JITTER_XY, GOTA_JITTER_XY),
+        y + random.uniform(-GOTA_JITTER_XY, GOTA_JITTER_XY),
+        z,
+    ]
+
+
+def actualizar_gotas(dt, regando, x_global, y_global, altura):
+    """Anima las gotas de agua. Se llama en cada paso de simulacion.
+
+    - Si no se esta regando (o la altura es demasiado baja para que se vea
+      bien la caida): aparca las gotas fuera de vista UNA sola vez.
+    - Si se esta regando: en el primer paso escalona las N gotas en el
+      tiempo (para que el chorro se vea continuo desde el instante 0, no
+      como si todas nacieran juntas) y luego las hace caer en paralelo,
+      reciclando cada una en cuanto "toca el suelo" bajo el dron.
+    """
+    global gotas_activas
+
+    if not regando or altura <= 0.05:
+        if gotas_activas:
+            for campo in gota_fields:
+                if campo is not None:
+                    campo.setSFVec3f([0.0, 0.0, GOTA_PARK_Z])
+            gotas_activas = False
+        return
+
+    if not gotas_activas:
+        tiempo_caida_total = math.sqrt(2.0 * max(altura, 0.05) / GOTA_G)
+        for i in range(N_GOTAS):
+            _nacer_gota(i, x_global, y_global, altura)
+            # Escalonar el "reloj" inicial de cada gota para que, desde el
+            # primer instante de riego, se vean gotas en distintas alturas
+            # de caida (cascada), no todas naciendo en el mismo punto.
+            gota_t[i] = (i / N_GOTAS) * tiempo_caida_total
+        gotas_activas = True
+
+    for i, campo in enumerate(gota_fields):
+        gota_t[i] += dt
+        ox, oy, oz = gota_origen[i]
+        caida = 0.5 * GOTA_G * (gota_t[i] ** 2)
+
+        if caida >= oz:
+            # Esta gota ya "toco el suelo" (Z <= 0 aprox bajo el dron) →
+            # renace desde la posicion actual del dron para mantener el
+            # chorro continuo mientras se siga regando.
+            _nacer_gota(i, x_global, y_global, altura)
+            ox, oy, oz = gota_origen[i]
+            caida = 0.0
+
+        if campo is not None:
+            campo.setSFVec3f([ox, oy, oz - caida])
+
+
+
 # ── 8. ESPERA DE INICIALIZACIÓN ──────────────────────────────────────────────
 print("=" * 60)
 print("  CONTROLADOR MAVIC — SISTEMA DE RIEGO AUTÓNOMO")
@@ -130,6 +229,12 @@ print("=" * 60)
 while robot.step(timestep) != -1:
     if robot.getTime() > 2.0:
         break   
+
+# CORREGIDO: antes se forzaba un yaw absoluto hardcodeado (-98 grados),
+# calibrado para otra sesion/mundo de Webots. Ahora se captura el yaw real
+# con el que este robot arranco en ESTE mundo, para que "mantener la
+# orientacion inicial" sea cierto sin importar en que .wbt se use.
+YAW_INICIAL = imu.getRollPitchYaw()[2]
 
 print("  Estado inicial: IDLE — Esperando datos de sensores...")
 
@@ -146,6 +251,13 @@ objetivo_xy    = [0.0, 0.0]
 objetivo_zona  = None               
 timer_riego    = 0.0               
 height_desired = ALTURA_OBJETIVO   
+
+# Integradores del control de posicion (X/Y). Se resetean cada vez que se fija
+# un objetivo nuevo, para evitar windup entre misiones distintas.
+KI_POS = 0.05
+integral_x = 0.0
+integral_y = 0.0
+INTEGRAL_MAX = 1.5
 
 MODO_AUTO   = "auto"
 MODO_MANUAL = "manual"
@@ -218,12 +330,14 @@ def enviar_telemetria(x_global, y_global, actual_altitude, speed_mps):
         print(f"  No se pudo enviar telemetria al bridge: {exc}")
 
 def avanzar_a_siguiente_zona_o_retorno(motivo: str):
-    global objetivo_zona, objetivo_xy, estado, timer_riego, cola_zonas
+    global objetivo_zona, objetivo_xy, estado, timer_riego, cola_zonas, integral_x, integral_y
 
     if cola_zonas:
         objetivo_zona = cola_zonas.pop(0)
         objetivo_xy = COORDENADAS_ZONAS.get(objetivo_zona, [0.0, 0.0])
         timer_riego = 0.0
+        integral_x = 0.0
+        integral_y = 0.0
         estado = NAVEGANDO
         print(f"  {motivo} Zonas pendientes en cola: siguiente → {objetivo_zona.upper()} (quedan {len(cola_zonas)}).")
     else:
@@ -238,12 +352,16 @@ def avanzar_a_siguiente_zona_o_retorno(motivo: str):
                 objetivo_xy = COORDENADAS_ZONAS.get(objetivo_zona, [0.0, 0.0])
                 cola_zonas = zonas_secas_nuevas[1:]  
                 timer_riego = 0.0
+                integral_x = 0.0
+                integral_y = 0.0
                 estado = NAVEGANDO
                 print(f"  {motivo} Nuevas zonas secas detectadas: {objetivo_zona.upper()}")
                 return
         
         objetivo_xy = BASE_XY.copy()
         objetivo_zona = None
+        integral_x = 0.0
+        integral_y = 0.0
         estado = RETORNO
         print(f"  {motivo} No quedan zonas pendientes. Iniciando RETORNO.")
 
@@ -277,6 +395,8 @@ while robot.step(timestep) != -1:
                     if z != zona and h is not None and requiere_riego(h)
                 ]
                 height_desired = ALTURA_OBJETIVO
+                integral_x     = 0.0
+                integral_y     = 0.0
                 estado         = ASCENSO
                 print(f"  [PWA] start_mission → zona {zona.upper()}. Iniciando ASCENSO.")
 
@@ -286,6 +406,8 @@ while robot.step(timestep) != -1:
                 cola_zonas  = []
                 objetivo_xy = BASE_XY.copy()
                 objetivo_zona = None
+                integral_x  = 0.0
+                integral_y  = 0.0
                 estado      = RETORNO
 
         elif tipo == "emergency_stop":
@@ -317,6 +439,8 @@ while robot.step(timestep) != -1:
                         if z != zona and h is not None and requiere_riego(h)
                     ]
                     height_desired = ALTURA_OBJETIVO
+                    integral_x     = 0.0
+                    integral_y     = 0.0
                     estado         = ASCENSO
                     print(f"  [AUTO] Riego requerido en {zona.upper()}. Iniciando ASCENSO.")
 
@@ -346,10 +470,21 @@ while robot.step(timestep) != -1:
     
     vertical_speed = (actual_altitude - past_altitude) / dt
 
+    # ── SEGURIDAD: si el dron se aleja demasiado de la base, aterrizar ya ────
+    # Esto no arregla la causa del desvio, pero evita perder el dron fuera
+    # del mapa mientras se diagnostica con los logs de abajo.
+    distancia_base = math.hypot(x_global - BASE_XY[0], y_global - BASE_XY[1])
+    if distancia_base > RADIO_SEGURO_M and estado not in (IDLE, DESCENSO):
+        print(f"  [SEGURIDAD] Distancia a base = {distancia_base:.1f}m > "
+              f"{RADIO_SEGURO_M}m. Forzando DESCENSO de emergencia.")
+        cola_zonas = []
+        estado = DESCENSO
+
     actual_yaw = rpy[2]
     
-    # Mantener siempre la orientación inicial
-    desired_yaw = math.radians(-98.0)
+    # Mantener siempre la orientación inicial (capturada al arrancar, no un
+    # numero fijo)
+    desired_yaw = YAW_INICIAL
     
     yaw_error = desired_yaw - actual_yaw
     
@@ -359,12 +494,16 @@ while robot.step(timestep) != -1:
     while yaw_error < -math.pi:
         yaw_error += 2 * math.pi
     
-    desired_yaw_r = constrain(2.0 * yaw_error, -0.5, 0.5)
+    K_YAW_D = 0.5
+    desired_yaw_r = constrain(2.0 * yaw_error - K_YAW_D * actual_yaw_rate, -0.5, 0.5)
     
     vx_global  = (x_global - past_x_global) / dt   
     vy_global  = (y_global - past_y_global) / dt   
     cosyaw = math.cos(actual_yaw)
     sinyaw = math.sin(actual_yaw) 
+
+    # ── EFECTO VISUAL: gotas de agua cayendo mientras se riega ───────────────
+    actualizar_gotas(dt, estado == REGANDO, x_global, y_global, actual_altitude)
 
     # ── C. MÁQUINA DE ESTADOS ────────────────────────────────────────────────
     if estado == IDLE:
@@ -389,19 +528,22 @@ while robot.step(timestep) != -1:
             error_x = objetivo_xy[0] - x_global
             error_y = objetivo_xy[1] - y_global
 
+            integral_x = constrain(integral_x + error_x * dt, -INTEGRAL_MAX, INTEGRAL_MAX)
+            integral_y = constrain(integral_y + error_y * dt, -INTEGRAL_MAX, INTEGRAL_MAX)
+
             # Modificado el tope de velocidad horizontal para el peso del Mavic
             distancia = math.sqrt(error_x**2 + error_y**2)
 
             velocidad_max = min(0.35, distancia * 0.25)
             
             desired_vx_global = constrain(
-                KP_POS * error_x - KD_POS * vx_global,
+                KP_POS * error_x + KI_POS * integral_x - KD_POS * vx_global,
                 -velocidad_max,
                 velocidad_max
             )
             
             desired_vy_global = constrain(
-                KP_POS * error_y - KD_POS * vy_global,
+                KP_POS * error_y + KI_POS * integral_y - KD_POS * vy_global,
                 -velocidad_max,
                 velocidad_max
             )
@@ -411,6 +553,7 @@ while robot.step(timestep) != -1:
             desired_vy = -desired_vx_global * sinyaw + desired_vy_global * cosyaw
 
             distancia_xy = math.sqrt(error_x**2 + error_y**2)
+
             if distancia_xy < TOLERANCIA_XY:
                 print(f"  Zona alcanzada en ({x_global:.2f}, {y_global:.2f}). Iniciando RIEGO...")
                 timer_riego = 0.0
@@ -444,18 +587,21 @@ while robot.step(timestep) != -1:
             error_x    = objetivo_xy[0] - x_global
             error_y    = objetivo_xy[1] - y_global
             
+            integral_x = constrain(integral_x + error_x * dt, -INTEGRAL_MAX, INTEGRAL_MAX)
+            integral_y = constrain(integral_y + error_y * dt, -INTEGRAL_MAX, INTEGRAL_MAX)
+
             distancia = math.sqrt(error_x**2 + error_y**2)
 
             velocidad_max = min(0.35, distancia * 0.25)
             
             desired_vx_global = constrain(
-                KP_POS * error_x - KD_POS * vx_global,
+                KP_POS * error_x + KI_POS * integral_x - KD_POS * vx_global,
                 -velocidad_max,
                 velocidad_max
             )
             
             desired_vy_global = constrain(
-                KP_POS * error_y - KD_POS * vy_global,
+                KP_POS * error_y + KI_POS * integral_y - KD_POS * vy_global,
                 -velocidad_max,
                 velocidad_max
             )
@@ -465,15 +611,40 @@ while robot.step(timestep) != -1:
             desired_vy = -desired_vx_global * sinyaw + desired_vy_global * cosyaw
 
             distancia_xy = math.sqrt(error_x**2 + error_y**2)
-            if distancia_xy < TOLERANCIA_XY:
-                print(f"  Base alcanzada. Iniciando DESCENSO")
+            velocidad_actual = math.hypot(vx_global, vy_global)
+            # CORREGIDO: antes solo se exigia estar cerca en XY (distancia_xy
+            # < TOLERANCIA_XY), sin importar que tan rapido se siguiera
+            # moviendo el dron en ese instante. Eso permitia soltar el
+            # control de posicion (pasar a DESCENSO) con velocidad residual,
+            # que luego se traducia en deriva durante el descenso. Ahora
+            # tambien se exige que la velocidad horizontal ya sea baja.
+            if distancia_xy < TOLERANCIA_XY and velocidad_actual < 0.10:
+                print(f"  Base alcanzada (v={velocidad_actual:.2f}m/s). Iniciando DESCENSO")
                 estado = DESCENSO   
 
         elif estado == DESCENSO:
             height_desired -= 0.15 * dt
             height_desired = max(0.0, height_desired)
-            desired_vx     = 0.0   
-            desired_vy     = 0.0
+
+            # Mantiene el mismo control de posicion P+I+D contra BASE_XY que
+            # usa RETORNO durante todo el descenso, para no perder el
+            # station-keeping mientras baja.
+            error_x = BASE_XY[0] - x_global
+            error_y = BASE_XY[1] - y_global
+
+            integral_x = constrain(integral_x + error_x * dt, -INTEGRAL_MAX, INTEGRAL_MAX)
+            integral_y = constrain(integral_y + error_y * dt, -INTEGRAL_MAX, INTEGRAL_MAX)
+
+            desired_vx_global = constrain(
+                KP_POS * error_x + KI_POS * integral_x - KD_POS * vx_global,
+                -0.15, 0.15
+            )
+            desired_vy_global = constrain(
+                KP_POS * error_y + KI_POS * integral_y - KD_POS * vy_global,
+                -0.15, 0.15
+            )
+            desired_vx = desired_vx_global * cosyaw + desired_vy_global * sinyaw
+            desired_vy = -desired_vx_global * sinyaw + desired_vy_global * cosyaw
 
             if actual_altitude <= ALTURA_SUELO + 0.02:
                 print("  Dron aterrizado. Volviendo a IDLE")
@@ -488,27 +659,37 @@ while robot.step(timestep) != -1:
              
 
         # ── PIPELINE PID COMPLETO ─────────────────────────────────────────────
-        K_POS_TO_ATT = 0.20
+        # CORREGIDO: el termino de posicion (roll_disturbance/pitch_disturbance)
+        # era ~250 veces mas chico que K_ROLL_P/K_PITCH_P, asi que el angulo de
+        # inclinacion real que se lograba era de apenas ~0.1-0.3 grados -
+        # invisible frente al sesgo natural del modelo. Por eso el dron
+        # practicamente ignoraba el objetivo sin importar el signo que
+        # probaramos. Ahora se calcula un ANGULO OBJETIVO real (como hace
+        # crazyflie_controller.py con pitch_desired/roll_desired) y el lazo de
+        # actitud persigue ESE angulo, no cero.
+        MAX_TILT = 0.25  # rad (~14°), inclinacion maxima seguridad para el Mavic
+        K_VEL_TO_TILT = 0.4  # rad por (m/s) de velocidad deseada, antes de recortar
 
         if estado == ASCENSO:
-            roll_disturbance = 0.0
-            pitch_disturbance = 0.0
+            roll_desired = 0.0
+            pitch_desired = 0.0
         else:
-            roll_disturbance = -desired_vy * K_POS_TO_ATT
-            pitch_disturbance = desired_vx * K_POS_TO_ATT
-        
+            roll_desired = constrain(-desired_vy * K_VEL_TO_TILT, -MAX_TILT, MAX_TILT)
+            pitch_desired = constrain(desired_vx * K_VEL_TO_TILT, -MAX_TILT, MAX_TILT)
+
+        roll_error = actual_roll - roll_desired
+        pitch_error = actual_pitch - pitch_desired
+
         yaw_disturbance = desired_yaw_r
-        
+
         roll_input = (
-            K_ROLL_P * constrain(actual_roll, -1.0, 1.0)
-            + actual_roll_rate
-            + roll_disturbance
+            K_ROLL_P * constrain(roll_error, -0.5, 0.5)
+            + K_ROLL_D * actual_roll_rate
         )
-        
+
         pitch_input = (
-            K_PITCH_P * constrain(actual_pitch, -1.0, 1.0)
-            + actual_pitch_rate
-            + pitch_disturbance
+            K_PITCH_P * constrain(pitch_error, -0.5, 0.5)
+            + K_PITCH_D * actual_pitch_rate
         )
         
         yaw_input = yaw_disturbance
@@ -558,5 +739,3 @@ while robot.step(timestep) != -1:
         speed_mps = math.sqrt(vx_global ** 2 + vy_global ** 2)
         enviar_telemetria(x_global, y_global, actual_altitude, speed_mps)
         last_telemetry_sent = current_time
-        
-        
