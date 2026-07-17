@@ -1,5 +1,5 @@
 """
-crazyflie_controller.py — Controlador autónomo con NAVEGACIÓN y MÁQUINA DE ESTADOS
+crazyflie_controller.py — LEGACY: controlador autónomo (usar `mavic_controller.py` para nuevas simulaciones)
 Proyecto: Sistema Inteligente de Control Autónomo para Drones de Riego
 Universidad Popular del Cesar
 

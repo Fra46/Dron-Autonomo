@@ -4,7 +4,7 @@ Proyecto: Sistema Inteligente de Control Autónomo para Drones de Riego
 Universidad Popular del Cesar
 
 Simula tres zonas de cultivo (norte / centro / sur) con rangos de humedad
-distintos y envía cada lectura como JSON al controlador del Crazyflie.
+distintos y envía cada lectura como JSON al controlador del Mavic 2 Pro.
 
 Uso:
     python sensor_mock.py
@@ -72,7 +72,7 @@ def generar_datos(zona: dict) -> dict:
 
 # ── Bucle principal ───────────────────────────────────────────────────────────
 print("=" * 70)
-print("🤖 SIMULADOR DE SENSORES — DRONE DE RIEGO (Crazyflie)")
+print("🤖 SIMULADOR DE SENSORES — DRONE DE RIEGO (Mavic 2 Pro)")
 print("=" * 70)
 print(f"📡 Transmitiendo a: {DESTINO_IP}:{DESTINO_PUERTO}")
 print()

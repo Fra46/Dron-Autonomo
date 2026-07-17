@@ -9,7 +9,7 @@
 >
 > Este trabajo fue creado para competir en el evento **20CCC Cartagena 2026**, que se realizará del **12 al 14 de agosto de 2026**.
 
-Sistema completo de riego agrícola autónomo que combina un dron Crazyflie con sensores de humedad del suelo, procesamiento de datos en tiempo real y una interfaz web progresiva (PWA) para monitoreo y control remoto.
+Sistema completo de riego agrícola autónomo que combina un dron Mavic 2 Pro con sensores de humedad del suelo, procesamiento de datos en tiempo real y una interfaz web progresiva (PWA) para monitoreo y control remoto.
 
 ## 🌟 Características Principales
 
@@ -30,7 +30,7 @@ Sistema completo de riego agrícola autónomo que combina un dron Crazyflie con 
 └─────────────────┘                                   │  (agregador con  │   + comandos de mision)  └──────────────┘
                                                       │     estado)      │
 ┌─────────────────┐                                   │                  │
-│ crazyflie_      │ ── UDP 5005 (drone_telemetry) ──► │                  │
+│ mavic_          │ ── UDP 5005 (drone_telemetry) ──► │                  │
 │ controller.py   │ ◄─ UDP 5006 (lecturas + cmds) ──  └──────────────────┘
 │ (Webots/Dron)   │
 └─────────────────┘
@@ -72,7 +72,7 @@ comandos de misión que la PWA envía por WebSocket (`start_mission`,
 
 ### Simulación
 - **Webots** - Entorno de simulación robótica
-- **Crazyflie Python API** - Control del dron
+- **Mavic 2 Pro (Webots model)** - Control del dron
 
 ## 🚀 Instalación y Configuración
 
@@ -269,7 +269,7 @@ VITE_WS_PORT=8765
 | Webots (opcional) | 1999 | TCP | — |
 
 > ⚠️ Importante: 5005 y 5006 son puertos distintos a propósito. Si ambos procesos
-> (`udp_websocket_bridge.py` y `crazyflie_controller.py` en Webots) intentaran
+> (`udp_websocket_bridge.py` y `mavic_controller.py` en Webots) intentaran
 > escuchar en el mismo puerto UDP en la misma máquina, uno de los dos fallaría
 > al iniciar (`Address already in use`).
 
@@ -300,7 +300,7 @@ por la PWA vía WebSocket y reenviados por el bridge al controlador por UDP:
 
 ### Lógica Difusa de Activación de Riego
 
-Implementada en `crazyflie_controller.py` exactamente como en las ecuaciones
+Implementada en `mavic_controller.py` exactamente como en las ecuaciones
 (1)-(3) del paper: se activa una misión cuando `μ_dry(h) + μ_very_dry(h) > θ`,
 con `θ = 0.65` (calibrado empíricamente, ver Tabla 2 del paper).
 
@@ -344,7 +344,7 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 - **ACEIS** - Asociación Centro de Estudios de Ingeniería de Sistemas, Universidad Popular del Cesar
 - **Universidad Popular del Cesar** - Institución educativa
 - **NASA SMAP** - Datos satelitales de humedad del suelo
-- **Bitcraze AB** - Crazyflie drone platform
+- **DJI** - Mavic 2 Pro drone platform
 - **Cyberbotics** - Webots simulation software
 
 ---

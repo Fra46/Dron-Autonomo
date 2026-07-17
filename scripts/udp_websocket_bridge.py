@@ -6,7 +6,7 @@ Universidad Popular del Cesar
 Implementa el bloque "Communication Middleware" descrito en el paper del 20CCC
 (Fig. 1 y Fig. 2): recibe telemetria real por UDP desde dos tipos de fuentes
 - lecturas de humedad de suelo (sensor_nasa.py / sensor_mock.py)
-- telemetria del dron (crazyflie_controller.py corriendo en Webots)
+ - telemetria del dron (mavic_controller.py corriendo en Webots)
 las fusiona en un unico snapshot ("Process telemetry" en la Fig. 2) y lo
 retransmite por WebSocket a la PWA. Tambien reenvia los comandos de mision
 que la PWA envia por WebSocket (start_mission, stop_mission, emergency_stop,
@@ -16,13 +16,13 @@ Diseno: el bridge NO inventa datos. Todo lo que agrega proviene de paquetes
 UDP reales recibidos de sensores o del controlador; unicamente los combina
 en una estructura coherente para la PWA (igual que en la Fig. 2 del paper).
 
-Esquema de puertos (evita colisiones con crazyflie_controller.py):
+Esquema de puertos (evita colisiones con mavic_controller.py):
     5005/UDP  -> el bridge escucha aqui. Sensores de suelo Y el controlador
                  del dron envian su telemetria a este puerto.
     5006/UDP  -> el bridge envia hacia aca: (a) las lecturas de suelo
                  reenviadas "tal cual" para que el controlador las use en su
                  logica difusa, y (b) los comandos de mision de la PWA.
-                 crazyflie_controller.py debe escuchar en este puerto.
+                 mavic_controller.py debe escuchar en este puerto.
     8765/TCP  -> WebSocket hacia la PWA.
 """
 
@@ -226,7 +226,7 @@ def procesar_lectura_suelo(datos: dict):
 
 def procesar_telemetria_dron(datos: dict):
     """Fusiona un paquete real de telemetria enviado por
-    crazyflie_controller.py en el estado agregado del dron."""
+    mavic_controller.py en el estado agregado del dron."""
     global last_drone_packet_ts
 
     drone_state["flightStatus"] = datos.get("flightStatus", drone_state["flightStatus"])
@@ -255,7 +255,7 @@ def procesar_telemetria_dron(datos: dict):
 
     # Efecto real de riego: mientras el dron esta "regando" la zona objetivo,
     # su humedad sube en cada tick de telemetria (~1 Hz, ver
-    # TELEMETRY_INTERVAL_S en crazyflie_controller.py). El resto de zonas (y
+    # TELEMETRY_INTERVAL_S en mavic_controller.py). El resto de zonas (y
     # esta misma cuando no se riega) se evaporan lentamente. El boost se
     # aplica a la proxima lectura cruda que llegue en procesar_lectura_suelo,
     # que sigue siendo la fuente de verdad de cada zona.

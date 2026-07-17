@@ -15,7 +15,7 @@
 └─────────────────┘                                   │  (agregador con  │   + comandos de misión)  └──────────────┘
                                                       │     estado)      │
 ┌─────────────────┐                                   │                  │
-│ crazyflie_      │ ── UDP 5005 (drone_telemetry) ──► │                  │
+│ mavic_          │ ── UDP 5005 (drone_telemetry) ──► │                  │
 │ controller.py   │ ◄─ UDP 5006 (lecturas + cmds) ──  └──────────────────┘
 │ (Webots/Dron)   │
 └─────────────────┘
@@ -125,7 +125,7 @@ toma la lógica difusa del controlador, ver más abajo — no un umbral fijo aqu
 
 `position`/`targetPosition` ya vienen proyectadas al espacio porcentual 0-100
 que usa el mapa de la PWA (`ZONE_LAYOUT` en `MapContainer.tsx`), no en metros
-de Webots — ver `proyectar_a_porcentaje()` en `crazyflie_controller.py`. Su
+de Webots — ver `proyectar_a_porcentaje()` en `mavic_controller.py`. Su
 campo `z` siempre es `0.0` (el mapa es 2D); la altitud real en metros viaja
 por separado en el campo `altitude` de nivel superior.
 `battery` se reporta fija en 100% (es una simulación en Webots, no hay batería
@@ -217,7 +217,7 @@ TIEMPO_RIEGO_S  = 20.0   # Segundos
 ```
 
 Las tres zonas comparten la misma `y` real (2.9) y solo varían en `x`;
-`proyectar_a_porcentaje()` en `crazyflie_controller.py` interpola linealmente
+`proyectar_a_porcentaje()` en `mavic_controller.py` interpola linealmente
 la `x` real del dron contra esas tres anclas (`sur→80%`, `centro→50%`,
 `norte→20%` en el eje vertical del mapa) y recorta el resultado a `[0,100]`
 para posiciones fuera de rango, como la base — así, si alguien reajusta estas
@@ -315,7 +315,7 @@ para que se vea en vivo durante la demo, incluso desde un teléfono.
 - El puente debe mostrar "UDP recibido" o el log de `procesar_lectura_suelo` en la consola
 
 ### El dron no responde en Webots / no llega telemetría del dron
-- El controlador `crazyflie_controller.py` debe escuchar en el puerto **5006**,
+-- El controlador `mavic_controller.py` debe escuchar en el puerto **5006**,
   no 5005 (5005 lo usa el bridge para recibir; si el controlador también
   intentara bindear 5005 en la misma máquina, fallaría con
   `Address already in use`).
