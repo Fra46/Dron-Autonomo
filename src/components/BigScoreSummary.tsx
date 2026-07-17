@@ -36,8 +36,10 @@ export default function BigScoreSummary({ humidity }: BigScoreSummaryProps) {
     <div className="glass panel-card">
       <h3 className="panel-title">Estado del Suelo</h3>
       
-      <div className="text-center mb-3">
-        <div className={`big-score ${irrigationStatus.type}`}>
+      <div className="text-center mb-2">
+        <div
+          className={`big-score ${irrigationStatus.type}`}
+          style={{ fontSize: '1.2rem', lineHeight: 1.2 }}>
           {irrigationStatus.label}
         </div>
         <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', marginBottom: 0 }}>
