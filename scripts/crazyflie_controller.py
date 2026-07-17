@@ -822,3 +822,4 @@ while robot.step(timestep) != -1:
         speed_mps = math.sqrt(vx_global ** 2 + vy_global ** 2)
         enviar_telemetria(x_global, y_global, actual_altitude, speed_mps)
         last_telemetry_sent = current_time
+        
