@@ -1,0 +1,268 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/dji/mavic/protos/Mavic2Pro.proto"
+
+WorldInfo {
+}
+Viewpoint {
+  orientation 0.1424948191006224 0.08668145007751636 -0.9859926737770114 2.061039490496087
+  position 4.780010242887402 10.560362756173623 1.8445218015706193
+  follow "Mavic 2 PRO"
+  followType "Mounted Shot"
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Solid {
+  translation 0.00969008 0.0199909 0.020005
+  rotation 0.5773509358554485 0.5773489358556708 0.5773509358554485 2.0944
+  children [
+    Transform {
+      scale 0.1 0.1 0.1
+      children [
+        CadShape {
+          url [
+            "../assets/terrain/farm-low-poly.obj"
+          ]
+        }
+      ]
+    }
+  ]
+  name "terrain"
+}
+RectangleArena {
+  translation 1.65 6.32 -0.15
+}
+Solid {
+  translation -0.876958 269.39 34.69
+  rotation -0.9831056944488314 0.1294279597735375 0.1294279597735375 -1.5878353071795859
+  children [
+    Transform {
+      translation 71.36 -34.69 261.31
+      scale 0.1 0.1 0.1
+      children [
+        CadShape {
+          url [
+            "../assets/terrain/Sin_nombre.obj"
+          ]
+        }
+      ]
+    }
+  ]
+  name "crop1"
+}
+Solid {
+  translation -0.876958 269.39 34.69
+  rotation -0.9831056944488314 0.1294279597735375 0.1294279597735375 -1.5878353071795859
+  children [
+    Transform {
+      translation 67.44 -34.69 262.49
+      scale 0.1 0.1 0.1
+      children [
+        CadShape {
+          url [
+            "../assets/terrain/Sin_nombre.obj"
+          ]
+        }
+      ]
+    }
+  ]
+  name "crop2"
+}
+Mavic2Pro {
+  translation 1.6463333122560602 6.330822722622832 -0.08442732818285106
+  rotation -0.035007158273645034 -0.03062570059039131 -0.9989176969765586 1.7068292999469277
+  controller "mavic_controller"
+  supervisor TRUE
+}
+
+# ── Gotas de agua (efecto visual de riego) ──────────────────────────────────
+# 10 esferas pequeñas y translúcidas, sin física ni boundingObject (solo
+# decorativas). El controlador (Supervisor) las mueve cada paso de
+# simulación via DEF, animándolas en caída libre cuando el dron está
+# REGANDO. Empiezan "aparcadas" muy por debajo del mapa (z = -50) para que
+# no se vean hasta que el controlador las active.
+DEF GOTA_0 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+        subdivision 1
+      }
+    }
+  ]
+  name "gota_0"
+}
+DEF GOTA_1 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+        subdivision 1
+      }
+    }
+  ]
+  name "gota_1"
+}
+DEF GOTA_2 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+        subdivision 1
+      }
+    }
+  ]
+  name "gota_2"
+}
+DEF GOTA_3 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+        subdivision 1
+      }
+    }
+  ]
+  name "gota_3"
+}
+DEF GOTA_4 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+        subdivision 1
+      }
+    }
+  ]
+  name "gota_4"
+}
+DEF GOTA_5 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+        subdivision 1
+      }
+    }
+  ]
+  name "gota_5"
+}
+DEF GOTA_6 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+        subdivision 1
+      }
+    }
+  ]
+  name "gota_6"
+}
+DEF GOTA_7 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+        subdivision 1
+      }
+    }
+  ]
+  name "gota_7"
+}
+DEF GOTA_8 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+        subdivision 1
+      }
+    }
+  ]
+  name "gota_8"
+}
+DEF GOTA_9 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+        subdivision 1
+      }
+    }
+  ]
+  name "gota_9"
+}

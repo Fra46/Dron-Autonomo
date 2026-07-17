@@ -1,0 +1,72 @@
+# Blender 5.1.2 MTL File: 'None'
+# www.blender.org
+
+newmtl Carrot
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd crops-low-poly/source/UnitedCrops/Crops/Carrot.png
+map_d crops-low-poly/source/UnitedCrops/Crops/Carrot.png
+
+newmtl CarrotPlant
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd C:/Users/bumro/OneDrive/Documents/_GuorquespeisUltraLaser/BlenderCosas/SAOProyect_Modelos/Texturas/Carrot_1.png
+map_d C:/Users/bumro/OneDrive/Documents/_GuorquespeisUltraLaser/BlenderCosas/SAOProyect_Modelos/Texturas/Carrot_1.png
+
+newmtl Dirt
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.119275 0.050917 0.014082
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+
+newmtl Potatoe
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd crops-low-poly/source/UnitedCrops/Crops/Potatoe.png
+map_d crops-low-poly/source/UnitedCrops/Crops/Potatoe.png
+
+newmtl Tomatoe
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd crops-low-poly/source/UnitedCrops/Crops/Tomatoe.png
+map_d crops-low-poly/source/UnitedCrops/Crops/Tomatoe.png
+
+newmtl Wheat
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd crops-low-poly/source/UnitedCrops/Crops/Wheat.png
+map_d crops-low-poly/source/UnitedCrops/Crops/Wheat.png
+
+newmtl Zanahoria
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.084618 0.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2

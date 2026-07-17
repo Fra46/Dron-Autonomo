@@ -1,0 +1,78 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "../protos/Crazyflie.proto"
+
+WorldInfo {
+}
+Viewpoint {
+  orientation 0.12942590976268464 0.34855986031537195 -0.9283075770772475 0.7609781497089184
+  position -3.594503061371684 9.635449100573746 2.3286472149953665
+  followType "Mounted Shot"
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Solid {
+  translation 0.00969008 0.0199909 0.020005
+  rotation 0.5773509358554485 0.5773489358556708 0.5773509358554485 2.0944
+  children [
+    Transform {
+      scale 0.1 0.1 0.1
+      children [
+        CadShape {
+          url [
+            "../assets/terrain/farm-low-poly.obj"
+          ]
+        }
+      ]
+    }
+  ]
+  name "terrain"
+}
+RectangleArena {
+  translation 1.65 6.32 -0.15
+}
+Solid {
+  translation -0.876958 269.39 34.69
+  rotation -0.9831056944488314 0.1294279597735375 0.1294279597735375 -1.5878353071795859
+  children [
+    Transform {
+      translation 71.36 -34.69 261.31
+      scale 0.1 0.1 0.1
+      children [
+        CadShape {
+          url [
+            "../assets/terrain/Sin_nombre.obj"
+          ]
+        }
+      ]
+    }
+  ]
+  name "crop1"
+}
+Solid {
+  translation -0.876958 269.39 34.69
+  rotation -0.9831056944488314 0.1294279597735375 0.1294279597735375 -1.5878353071795859
+  children [
+    Transform {
+      translation 67.44 -34.69 262.49
+      scale 0.1 0.1 0.1
+      children [
+        CadShape {
+          url [
+            "../assets/terrain/Sin_nombre.obj"
+          ]
+        }
+      ]
+    }
+  ]
+  name "crop2"
+}
+Crazyflie {
+  translation 1.65 6.32 -0.135
+  controller "crazyflie_controller"
+}
