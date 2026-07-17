@@ -24,11 +24,11 @@ Sistema completo de riego agrícola autónomo que combina un dron Crazyflie con 
 ## 🏗️ Arquitectura del Sistema
 
 ```
-┌─────────────────┐                                  ┌──────────────────┐    WebSocket (8765)    ┌──────────────┐
-│  sensor_nasa.py │ ── UDP 5005 (lectura de suelo) ─► │  udp_websocket   │ ◄─────────────────────► │     PWA      │
-│  sensor_mock.py │                                   │    _bridge.py    │   (snapshot agregado    │  (Frontend)  │
-└─────────────────┘                                   │  (agregador con  │    + comandos de mision) └──────────────┘
-                                                       │     estado)      │
+┌─────────────────┐                                   ┌──────────────────┐    WebSocket (8765)      ┌──────────────┐
+│  sensor_nasa.py │ ── UDP 5005 (lectura de suelo) ─► │  udp_websocket   │ ◄──────────────────────► │     PWA      │
+│  sensor_mock.py │                                   │    _bridge.py    │   (snapshot agregado     │  (Frontend)  │
+└─────────────────┘                                   │  (agregador con  │   + comandos de mision)  └──────────────┘
+                                                      │     estado)      │
 ┌─────────────────┐                                   │                  │
 │ crazyflie_      │ ── UDP 5005 (drone_telemetry) ──► │                  │
 │ controller.py   │ ◄─ UDP 5006 (lecturas + cmds) ──  └──────────────────┘
@@ -37,7 +37,7 @@ Sistema completo de riego agrícola autónomo que combina un dron Crazyflie con 
         │
 ┌───────▼─────────────────────────────────────────────────────────────────┐
 │                       Webots Simulation Environment                     │
-└───────────────────────────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 El bridge fusiona ambas fuentes (humedad de suelo + telemetría real del dron) en
@@ -53,7 +53,7 @@ comandos de misión que la PWA envía por WebSocket (`start_mission`,
 | **Bridge UDP-WebSocket** | Python + WebSockets | Puente de comunicación |
 | **Simulador de Sensores** | Python | Datos de humedad simulados |
 | **Sensor NASA SMAP** | Python + EarthAccess | Datos satelitales reales |
-| **Controlador Crazyflie** | Python + Webots API | Control del dron físico |
+| **Controlador Mavic (Webots)** | Python + Webots API | Control del dron físico en simulación |
 
 ## 🛠️ Tecnologías Utilizadas
 
@@ -85,8 +85,7 @@ comandos de misión que la PWA envía por WebSocket (`start_mission`,
 ### 1. Clonar el Repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/agrodron-autonomo.git
-cd agrodron-autonomo
+git clone https://github.com/Fra46/Dron-Autonomo.git
 ```
 
 ### 2. Instalar Dependencias del Frontend
@@ -94,12 +93,7 @@ cd agrodron-autonomo
 ```bash
 # Instalar dependencias de Node.js
 npm install
-
-# Iniciar servidor de desarrollo
-npm run dev
 ```
-
-La PWA estará disponible en `http://localhost:3000`
 
 ### 3. Configurar Scripts Python
 
@@ -107,57 +101,51 @@ La PWA estará disponible en `http://localhost:3000`
 # Instalar dependencias de Python
 pip install websockets
 
-# Para datos satelitales de NASA (opcional)
+# Para datos satelitales de NASA
 pip install earthaccess h5py numpy
 ```
 
 ### 📖 Configuración de Credenciales NASA (Importante ⭐)
 
-Si quieres usar **datos reales del satélite SMAP de NASA** (fuente de datos
-principal del proyecto), `scripts/sensor_nasa.py` se autentica via EarthAccess
-con estas variables de entorno, tomadas de un archivo `.env` en la raíz del
-proyecto (copia `.env.example` como `.env` y completa tus credenciales):
-- `EARTHDATA_USERNAME`
-- `EARTHDATA_PASSWORD`
-- o `EARTHDATA_TOKEN`
+Para usar **datos reales del satélite SMAP de NASA** con `scripts/sensor_nasa.py`,
+se debe guardar el token de Earthdata en el almacén seguro del sistema usando
+`keyring`.
 
+1. Crea una cuenta y obtén tu token en:
+   https://urs.earthdata.nasa.gov/home
 
-También puedes guardarlo de forma más segura en el almacén de secretos del sistema
-(con `keyring`) para no dejarlo en archivos de texto. En Windows, por ejemplo:
+2. Instala `keyring`:
 
 ```powershell
 python -m pip install keyring
+```
+
+3. Guarda tu token en el keyring:
+
+```powershell
 python scripts/set_earthdata_token.py "TU_TOKEN_AQUI"
 ```
 
-Este comando guarda el token sin pedirte que lo pegues interactivamente en el
-terminal. El script lo leerá automáticamente si no encuentra `EARTHDATA_TOKEN`
-en el entorno o en `.env`.
+El script almacena el token en el servicio `earthdata` con usuario `token`.
+`python scripts/sensor_nasa.py` lo lee automáticamente del keyring.
 
-El script también acepta los alias `EARTHACCESS_USERNAME`, `EARTHACCESS_PASSWORD` y `EARTHACCESS_TOKEN`.
+Si no configuras el token en el keyring o si la conexión remota a NASA falla,
+el sistema cae automáticamente a un fallback simulado sin interrumpir el flujo
+de telemetría.
 
-Si no configuras credenciales, o si la conexión remota a NASA falla, el sistema
-cae automáticamente a un fallback simulado sin interrumpir el flujo de telemetría.
-
-> 🔒 **Seguridad:** `.env` está en `.gitignore` y **nunca debe commitearse** —
-> solo `.env.example` (con placeholders) va al repositorio. Si en algún momento
-> un `.env` real llegó a commitearse por error, las credenciales que contenía
-> deben considerarse comprometidas: revócalas/regenéralas en
-> https://urs.earthdata.nasa.gov/ y, si el repositorio es público o tiene
-> colaboradores externos, purga el archivo del historial de git (por ejemplo
-> con `git filter-repo --path .env --invert-paths`).
-
-> ⚠️ Nota de mantenimiento: esta sección enlazaba antes a `scripts/NASA_CREDENTIALS.md` y `scripts/MEJORAS_SISTEMA_SENSORES.md`, pero ninguno de los dos archivos existe en el repo. Si alguien del equipo los tiene localmente, súbanlos a `docs/` — mientras tanto se quitaron los enlaces rotos.
-
-### 4. Configurar Webots (Opcional)
+### 4. Configurar Webots
 
 1. Instalar [Webots R2023b+](https://cyberbotics.com/)
-2. Abrir el proyecto de Webots incluido
-3. Configurar el controlador `crazyflie_controller.py`
+2. Abrir el proyecto de Webots incluido en `AgroDrone-Webots/`
+3. Abrir el mundo final `AgroDrone-Webots/worlds/AgroDrone4.wbt`
+4. Seleccionar el robot y asignar el controlador `AgroDrone-Webots/controllers/mavic_controller/mavic_controller.py`
+5. Iniciar la simulación para que el controlador envíe telemetría al bridge UDP/WebSocket
+
+> 📌 Nota: la simulación final del proyecto es `AgroDrone4.wbt` y el controlador principal usado en la versión de entrega es `mavic_controller.py`.
 
 ## 📖 Uso
 
-### Inicio Rápido (Recomendado 🚀)
+### Inicio Rápido 🚀
 
 **Terminal 1 — Bridge UDP-WebSocket:**
 ```bash
@@ -168,9 +156,9 @@ python udp_websocket_bridge.py
 **Terminal 2 — Sensor de datos (fuente principal: NASA SMAP):**
 ```bash
 # Opción A (recomendada): datos reales del satélite NASA SMAP
-# Requiere credenciales en .env — ver "Configuración de Credenciales NASA" abajo.
+# Requiere token de Earthdata guardado en keyring — ver "Configuración de Credenciales NASA" arriba.
 python sensor_nasa.py
-# → Si no hay credenciales o falla la conexión remota, cae automáticamente
+# → Si no hay token en keyring o falla la conexión remota, cae automáticamente
 #   a un fallback simulado compatible, sin detener el flujo de telemetría.
 
 # Opción B: simulador puro, útil solo para desarrollo rápido sin red/credenciales
@@ -179,7 +167,7 @@ python sensor_mock.py
 
 **Terminal 3 — Simulación del dron (Webots):**
 ```bash
-# Abrir el mundo de Webots y cargar crazyflie_controller.py como controlador
+# Abrir el mundo de Webots y cargar mavic_controller.py como controlador
 # del robot. Emite telemetría real (posición, batería estimada, estado de
 # la máquina de estados) de vuelta al bridge en el puerto 5005.
 ```
@@ -187,17 +175,19 @@ python sensor_mock.py
 **Terminal 4 — PWA Frontend:**
 ```bash
 # En la raíz del proyecto
-npm run dev
-# Abrir: http://localhost:3000
+npm run dev -- --host
 ```
+
+> 📱 Para usar la PWA desde el teléfono, ejecuta `npm run dev -- --host` y abre
+> `http://<IP-del-PC>:3000` desde el navegador del dispositivo en la misma red.
 
 ### Modos de Operación
 
 | Modo | Comando | Datos | Velocidad | Requisitos |
 |------|---------|-------|-----------|-----------|
-| **NASA SMAP Real** (recomendado) | `sensor_nasa.py` | Satélite real, con fallback simulado integrado | 🐢 Lento (1a) | Credenciales NASA en `.env` |
+| **NASA SMAP Real** (recomendado) | `sensor_nasa.py` | Satélite real, con fallback simulado integrado | 🐢 Lento (1a) | Token Earthdata en keyring |
 | **Simulación** | `sensor_mock.py` | Aleatorios realistas | ⚡ Rápido | Ninguno |
-| **Simulación Completa** | Webots + `crazyflie_controller.py` | Física realista + telemetría real del dron | 🐢 Muy lento | Webots instalado |
+| **Simulación Completa** | Webots + `mavic_controller.py` | Física realista + telemetría real del dron | 🐢 Muy lento | Webots instalado |
 
 ✅ **Nota:** Si `sensor_nasa.py` no tiene credenciales o falla la conexión remota, **automáticamente cambia a datos simulados** sin interrumpir el flujo de telemetría hacia la PWA.
 
@@ -222,7 +212,7 @@ agrodron-autonomo/
 │   ├── sensor_mock.py
 │   ├── sensor_nasa.py
 │   ├── udp_websocket_bridge.py
-│   ├── crazyflie_controller.py
+│   ├── mavic_controller.py
 │   └── measure_bridge_latency.py   # Mide latencia real UDP → WebSocket
 ├── 📁 docs/
 │   └── TELEMETRY.md           # Documentación detallada del protocolo de telemetría
@@ -242,7 +232,7 @@ agrodron-autonomo/
 | `sensor_mock.py` | `python sensor_mock.py` | Simula sensores de humedad |
 | `sensor_nasa.py` | `python sensor_nasa.py` | Descarga datos reales NASA SMAP |
 | `udp_websocket_bridge.py` | `python udp_websocket_bridge.py` | Puente UDP ↔ WebSocket |
-| `crazyflie_controller.py` | `python crazyflie_controller.py` | Controlador del dron Webots |
+| `mavic_controller.py` | `python mavic_controller.py` | Controlador del dron Webots |
 | `measure_bridge_latency.py` | `python measure_bridge_latency.py --samples 300` | Mide la latencia real extremo a extremo UDP → WebSocket (requiere el bridge corriendo) |
 
 ### Scripts NPM
@@ -275,7 +265,7 @@ VITE_WS_PORT=8765
 | Frontend PWA | 3000 | HTTP | — |
 | Puente WebSocket | 8765 | WebSocket | Bridge ↔ PWA |
 | Bridge — entrada de telemetría | 5005 | UDP | Sensores de suelo → Bridge, Dron → Bridge |
-| Bridge — salida al controlador | 5006 | UDP | Bridge → `crazyflie_controller.py` (lecturas reenviadas + comandos de misión) |
+| Bridge — salida al controlador | 5006 | UDP | Bridge → `mavic_controller.py` (lecturas reenviadas + comandos de misión) |
 | Webots (opcional) | 1999 | TCP | — |
 
 > ⚠️ Importante: 5005 y 5006 son puertos distintos a propósito. Si ambos procesos

@@ -27,28 +27,23 @@ USE_MOCK_MODE = False  # Se activará si falla conexión a NASA
 print("🌍 Conectando con NASA SMAP...")
 print()
 
-# EarthAccess usa EARTHDATA_USERNAME / EARTHDATA_PASSWORD o EARTHDATA_TOKEN.
-# Permitimos también alias comunes, un archivo .env y un secret del sistema.
-def sync_earthdata_env_vars():
+# EarthAccess usa EARTHDATA_TOKEN. El token se obtiene únicamente del keyring del sistema.
+def sync_earthdata_keyring_token():
     credentials = resolve_earthdata_credentials()
-    if credentials.get("EARTHDATA_USERNAME"):
-        os.environ.setdefault("EARTHDATA_USERNAME", credentials["EARTHDATA_USERNAME"])
-    if credentials.get("EARTHDATA_PASSWORD"):
-        os.environ.setdefault("EARTHDATA_PASSWORD", credentials["EARTHDATA_PASSWORD"])
     if credentials.get("EARTHDATA_TOKEN"):
         os.environ.setdefault("EARTHDATA_TOKEN", credentials["EARTHDATA_TOKEN"])
 
 
 def has_nasa_credentials():
-    return bool(os.environ.get("EARTHDATA_USERNAME") and os.environ.get("EARTHDATA_PASSWORD")) or bool(os.environ.get("EARTHDATA_TOKEN"))
+    return bool(os.environ.get("EARTHDATA_TOKEN"))
 
 
-sync_earthdata_env_vars()
+sync_earthdata_keyring_token()
 
 if has_nasa_credentials():
-    print("✅ Credenciales de NASA detectadas. Intentando autenticación...")
+    print("✅ Credenciales de NASA detectadas en el keyring. Intentando autenticación...")
 else:
-    print("⚠️ No se encontraron credenciales de NASA. Se buscará un archivo .env o se usará modo simulación.")
+    print("⚠️ No se encontró token de NASA en el keyring. Se usará modo simulación.")
 
 try:
     auth = None

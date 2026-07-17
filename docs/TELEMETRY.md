@@ -9,11 +9,11 @@
 ## Arquitectura de Comunicación
 
 ```
-┌─────────────────┐                                  ┌──────────────────┐    WebSocket (8765)    ┌──────────────┐
-│  sensor_nasa.py │ ── UDP 5005 (lectura de suelo) ─► │  udp_websocket   │ ◄─────────────────────► │     PWA      │
-│  sensor_mock.py │                                   │    _bridge.py    │   (snapshot agregado    │  (Frontend)  │
-└─────────────────┘                                   │  (agregador con  │    + comandos de misión) └──────────────┘
-                                                       │     estado)      │
+┌─────────────────┐                                   ┌──────────────────┐    WebSocket (8765)      ┌──────────────┐
+│  sensor_nasa.py │ ── UDP 5005 (lectura de suelo) ─► │  udp_websocket   │ ◄──────────────────────► │     PWA      │
+│  sensor_mock.py │                                   │    _bridge.py    │   (snapshot agregado     │  (Frontend)  │
+└─────────────────┘                                   │  (agregador con  │   + comandos de misión)  └──────────────┘
+                                                      │     estado)      │
 ┌─────────────────┐                                   │                  │
 │ crazyflie_      │ ── UDP 5005 (drone_telemetry) ──► │                  │
 │ controller.py   │ ◄─ UDP 5006 (lecturas + cmds) ──  └──────────────────┘
@@ -36,7 +36,7 @@ python udp_websocket_bridge.py
 
 El puente escuchará en:
 - **UDP 5005:** entrada — sensores de suelo Y telemetría del dron
-- **UDP 5006 (saliente):** hacia `crazyflie_controller.py` — reenvía lecturas de suelo y comandos de misión
+- **UDP 5006 (saliente):** hacia `mavic_controller.py` — reenvía lecturas de suelo y comandos de misión
 - **WebSocket 8765:** hacia la PWA
 
 ## Paso 2: Iniciar el Sensor de Datos (NASA SMAP es la fuente principal)
@@ -47,9 +47,9 @@ pip install earthaccess h5py numpy
 python sensor_nasa.py
 ```
 Descarga datos reales del satélite SMAP de la NASA para la región del Cesar.
-Requiere credenciales en `.env` (ver README principal). Si no hay credenciales
-o falla la conexión remota, cae automáticamente a un fallback simulado
-compatible, sin detener el flujo de telemetría.
+Requiere un token de Earthdata guardado en el keyring del sistema (ver README
+principal). Si no hay token o falla la conexión remota, cae automáticamente a
+un fallback simulado compatible, sin detener el flujo de telemetría.
 
 ### Opción B: Datos Simulados (sensor_mock.py)
 ```bash
@@ -69,7 +69,7 @@ La PWA se conecta automáticamente al WebSocket en `ws://localhost:8765`.
 ## Paso 4: Ejecutar el Dron en Webots
 
 ```bash
-# En Webots, cargar el controlador crazyflie_controller.py como controlador del robot.
+# En Webots, cargar el controlador mavic_controller.py como controlador del robot.
 # Escucha en el puerto UDP 5006 (lecturas de suelo reenviadas + comandos de misión)
 # y envía su telemetría real (posición, batería estimada, estado FSM) al bridge
 # por UDP en el puerto 5005.
@@ -106,7 +106,7 @@ respaldo si un sensor viejo no lo envía (`procesar_lectura_suelo` en
 (Estas etiquetas son descriptivas; la decisión real de activar el riego la
 toma la lógica difusa del controlador, ver más abajo — no un umbral fijo aquí.)
 
-### Entrada UDP al bridge — telemetría del dron (crazyflie_controller.py → bridge, puerto 5005)
+### Entrada UDP al bridge — telemetría del dron (mavic_controller.py → bridge, puerto 5005)
 
 ```json
 {
@@ -133,6 +133,10 @@ física que consumir). `waterLevel` sí es una **estimación** por tiempo
 transcurrido de riego (Webots no expone un sensor real de nivel de tanque).
 `modo` refleja si el controlador está en `"auto"` (riega por su cuenta) o
 `"manual"` (solo por botón — ver sección "Modo de operación" más abajo).
+
+> Nota: muchas referencias de diseño usan `crazyflie_controller.py` por historial,
+> pero la implementación actual del robot en Webots es `mavic_controller.py`.
+
 
 ### Salida WebSocket del bridge → PWA (snapshot agregado)
 

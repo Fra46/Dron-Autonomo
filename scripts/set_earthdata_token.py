@@ -5,7 +5,7 @@ import sys
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Store your Earthdata token securely in the system keyring")
-    parser.add_argument("token", nargs="?", help="Earthdata token to store. If omitted, the script uses EARTHDATA_TOKEN from the environment.")
+    parser.add_argument("token", help="Earthdata token to store")
     parser.add_argument("--service", default="earthdata", help="Keyring service name (default: earthdata)")
     parser.add_argument("--username", default="token", help="Keyring username (default: token)")
     return parser.parse_args()
@@ -13,10 +13,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    token = args.token or os.environ.get("EARTHDATA_TOKEN")
+    token = args.token
 
     if not token:
-        print("No se encontró un token. Pásalo como argumento o define EARTHDATA_TOKEN.")
+        print("No se encontró un token. Pásalo como argumento.")
         print("Ejemplo: python scripts/set_earthdata_token.py \"TU_TOKEN\"")
         return 1
 
