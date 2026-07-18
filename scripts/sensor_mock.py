@@ -70,41 +70,44 @@ def generar_datos(zona: dict) -> dict:
     }
 
 
-# ── Bucle principal ───────────────────────────────────────────────────────────
+# ── Bucle principal (independiente por zona, no bloquea las demás) ─────────
 print("=" * 70)
 print("🤖 SIMULADOR DE SENSORES — DRONE DE RIEGO (Mavic 2 Pro)")
 print("=" * 70)
 print(f"📡 Transmitiendo a: {DESTINO_IP}:{DESTINO_PUERTO}")
 print()
 
+next_send = {z["nombre"]: 0.0 for z in ZONAS}
+
 try:
     while True:
-        zona  = next(ciclo_zonas)
-        datos = generar_datos(zona)
+        now = time.time()
+        for zona in ZONAS:
+            nombre = zona["nombre"]
+            if now < next_send[nombre]:
+                continue
 
-        # Serializar a JSON y enviar por UDP
-        mensaje = json.dumps(datos).encode("utf-8")
-        sock.sendto(mensaje, (DESTINO_IP, DESTINO_PUERTO))
+            datos = generar_datos(zona)
+            mensaje = json.dumps(datos).encode("utf-8")
+            sock.sendto(mensaje, (DESTINO_IP, DESTINO_PUERTO))
 
-        # Indicador visual en consola
-        estado_emoji = {
-            "humedo"  : "💧",
-            "normal"  : "✅",
-            "seco"    : "⚠️",
-            "muy_seco": "🔴",
-        }.get(datos["estado_suelo"], "?")
+            estado_emoji = {
+                "humedo": "💧", "normal": "✅", "seco": "⚠️", "muy_seco": "🔴",
+            }.get(datos["estado_suelo"], "?")
 
-        print(
-            f"  {estado_emoji} Zona: {datos['zona']:<8} | "
-            f"💧 Humedad: {datos['humedad']:>3}% | "
-            f"🌡️ Temp: {datos['temperatura']:>4}°C | "
-            f"🔋 Batería: {datos['bateria']:>3}% | "
-            f"🌱 Estado: {datos['estado_suelo']}"
-        )
+            print(
+                f"  {estado_emoji} Zona: {datos['zona']:<8} | "
+                f"💧 Humedad: {datos['humedad']:>3}% | "
+                f"🌡️ Temp: {datos['temperatura']:>4}°C | "
+                f"🔋 Batería: {datos['bateria']:>3}% | "
+                f"🌱 Estado: {datos['estado_suelo']}"
+            )
 
-        time.sleep(1)   # Una lectura por segundo 
-        if datos["estado_suelo"] == "muy_seco":
-            time.sleep(30)   # Pausa adicional para simular riego activo
+            # Pausa individual: 30s si esa zona está muy seca (simula riego
+            # en curso), 1s en caso normal — sin bloquear a las otras zonas.
+            next_send[nombre] = now + (30 if datos["estado_suelo"] == "muy_seco" else 1)
+
+        time.sleep(0.5)
 
 except KeyboardInterrupt:
     print()

@@ -50,24 +50,8 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
 
   const dronePosition = useMemo(
     () => ({
-      x: Math.max(
-        0,
-        Math.min(
-          100,
-          typeof telemetry.drone.position.xPct === 'number'
-            ? telemetry.drone.position.xPct
-            : 50,
-        ),
-      ),
-      y: Math.max(
-        0,
-        Math.min(
-          100,
-          typeof telemetry.drone.position.yPct === 'number'
-            ? telemetry.drone.position.yPct
-            : 95,
-        ),
-      ),
+      x: Math.max(0, Math.min(100, telemetry.drone.position.xPct)),
+      y: Math.max(0, Math.min(100, telemetry.drone.position.yPct)),
     }),
     [telemetry.drone.position.xPct, telemetry.drone.position.yPct]
   )

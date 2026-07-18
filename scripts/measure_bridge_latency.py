@@ -27,8 +27,6 @@ async def run_measurement(host: str, udp_port: int, ws_url: str, samples: int, i
     loop = asyncio.get_running_loop()
 
     latencies = []
-    results = []
-    pending = {}
     received = set()
 
     async def websocket_listener():
@@ -58,11 +56,9 @@ async def run_measurement(host: str, udp_port: int, ws_url: str, samples: int, i
                 latency_ms = (recv_ts - float(send_ts)) * 1000.0
                 latencies.append(latency_ms)
                 received.add(probe_id)
-                results.append(latency_ms)
                 print(f"[{len(received)}/{samples}] probe_id={probe_id} latency={latency_ms:.2f} ms")
 
     async def udp_sender():
-        nonlocal pending
         zones = [
             ("norte", 45.0, 30.0, "seco"),
             ("centro", 55.0, 32.0, "normal"),
@@ -74,7 +70,6 @@ async def run_measurement(host: str, udp_port: int, ws_url: str, samples: int, i
             send_ts = time.perf_counter()
             packet = make_probe_message(probe_id, send_ts, zone, humidity, temperature, estado)
             udp_sock.sendto(packet, (host, udp_port))
-            pending[probe_id] = send_ts
             await asyncio.sleep(interval)
         print(f"[UDP] Enviados {samples} paquetes de prueba")
 

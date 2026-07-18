@@ -118,7 +118,7 @@ export const DEFAULT_TELEMETRY: TelemetryData = {
   drone: {
     flightStatus: 'idle',
     battery: 100,
-    position: DEFAULT_MAP_POSITION,
+    position: { xPct: 15, yPct: 50, zPct: 0 },
     targetZone: null,
     waterLevel: 100,
     altitude: 0,

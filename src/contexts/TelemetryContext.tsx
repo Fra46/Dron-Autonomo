@@ -1,5 +1,3 @@
-'use client'
-
 import { createContext, useContext, ReactNode, useEffect } from 'react'
 import { useTelemetry } from '@/hooks/use-telemetry'
 import type { TelemetryData } from '@/lib/telemetry'
@@ -20,7 +18,11 @@ const TelemetryContext = createContext<TelemetryContextType | null>(null)
 
 export function TelemetryProvider({ children }: { children: ReactNode }) {
   const telemetryState = useTelemetry({
-    wsUrl: typeof window !== 'undefined' ? `ws://${window.location.hostname}:8765` : '',
+    wsUrl: typeof window !== 'undefined'
+      ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${
+          import.meta.env.VITE_WS_HOST || window.location.hostname
+        }:${import.meta.env.VITE_WS_PORT || '8765'}`
+      : '',
   })
 
   useEffect(() => {

@@ -1,11 +1,13 @@
 import { useMemo } from 'react'
 import { Row, Col } from 'react-bootstrap'
+import type { TelemetryZones } from '@/lib/telemetry'
 
 interface BigScoreSummaryProps {
   humidity: number
+  zones: TelemetryZones
 }
 
-export default function BigScoreSummary({ humidity }: BigScoreSummaryProps) {
+export default function BigScoreSummary({ humidity, zones }: BigScoreSummaryProps) {
   const irrigationStatus = useMemo(() => {
     if (humidity < 40) {
       return {
@@ -27,10 +29,10 @@ export default function BigScoreSummary({ humidity }: BigScoreSummaryProps) {
 
   const stats = useMemo(() => {
     const nextWindow = humidity < 40 ? 'Ahora' : `${Math.max(1, Math.ceil((humidity - 40) / 5))} hrs`
-    const priorityAreas = humidity < 40 ? 4 : humidity < 55 ? 2 : 0
+    const priorityAreas = Object.values(zones).filter(z => z.humedad < 40).length
     
     return { nextWindow, priorityAreas }
-  }, [humidity])
+  }, [humidity, zones])
 
   return (
     <div className="glass panel-card">

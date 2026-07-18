@@ -78,7 +78,7 @@ comandos de misión que la PWA envía por WebSocket (`start_mission`,
 
 ### Prerrequisitos
 
-- **Node.js** 18+ y **npm** (o pnpm/yarn si prefieren, pero el lockfile commiteado es de npm)
+- **Node.js** 20.19+ o 22.12+ y **npm** (requerido por Vite 8 / rolldown en package-lock.json)
 - **Python** 3.8+ con pip
 - **Webots** (opcional, para simulación completa)
 

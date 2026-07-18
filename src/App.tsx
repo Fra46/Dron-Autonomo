@@ -37,7 +37,7 @@ function AppContent() {
               </div>
 
               <div className="fade-up delay-2">
-                <BigScoreSummary humidity={telemetry.averageHumidity} />
+                <BigScoreSummary humidity={telemetry.averageHumidity} zones={telemetry.zones} />
               </div>
             </div>
           </div>

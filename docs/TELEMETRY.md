@@ -272,7 +272,7 @@ responde directamente sin tocar el controlador):
 {"type": "stop_mission"}
 {"type": "emergency_stop"}
 {"type": "request_status", "client_ts": 1784112707551}
-{"type": "set_mode", "modo": "manual"}
+{"type": "set_mode", "mode": "manual"}
 ```
 
 Los cinco están expuestos en la UI de `MissionControl.tsx` ("Iniciar misión",
