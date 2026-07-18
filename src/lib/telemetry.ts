@@ -10,6 +10,18 @@ export interface Coordinates {
   altitude: number
 }
 
+/**
+* Posición proyectada al espacio 0-100 que usa el mapa 2D de la PWA
+* (ver ZONE_LAYOUT en MapContainer.tsx). NO son coordenadas GPS reales;
+* xPct/yPct son porcentajes del lienzo del mapa. zPct existe solo por
+* compatibilidad con el paquete UDP (siempre 0, ver mavic_controller.py).
+*/
+export interface MapPosition {
+  xPct: number
+  yPct: number
+  zPct: number
+}
+
 export interface ZoneData {
   humedad: number
   estado: ZoneState
@@ -22,13 +34,11 @@ export type OperationMode = 'auto' | 'manual'
 export interface DroneState {
   flightStatus: FlightStatus
   battery: number
-  position: Coordinates
+  position: MapPosition
   targetZone: string | null
   waterLevel: number
   // Altitud real en metros reportada por el controlador (independiente de
-  // `position.altitude`, que en realidad es el eje Z=0 del mapa 2D de la
-  // PWA). Antes la barra de telemetria leia position.altitude y por eso
-  // nunca se actualizaba: ese campo siempre llegaba en 0.
+  // `position.zPct`, que es siempre 0 porque el mapa de la PWA es 2D).
   altitude: number
   mode: OperationMode
 }
@@ -68,7 +78,7 @@ export interface TelemetryData {
   timestamp: number
   lastSync: number
   coordinates: Coordinates
-  targetPosition: Coordinates
+  targetPosition: MapPosition
   signal: number
   temperature: number
   speed: number
@@ -85,6 +95,8 @@ const DEFAULT_COORDINATES: Coordinates = {
   longitude: 0,
   altitude: 0,
 }
+
+const DEFAULT_MAP_POSITION: MapPosition = { xPct: 0, yPct: 0, zPct: 0 }
 
 export const DEFAULT_TELEMETRY: TelemetryData = {
   zones: {
@@ -104,7 +116,7 @@ export const DEFAULT_TELEMETRY: TelemetryData = {
   drone: {
     flightStatus: 'idle',
     battery: 100,
-    position: DEFAULT_COORDINATES,
+    position: DEFAULT_MAP_POSITION,
     targetZone: null,
     waterLevel: 100,
     altitude: 0,
@@ -115,7 +127,7 @@ export const DEFAULT_TELEMETRY: TelemetryData = {
   timestamp: Date.now(),
   lastSync: Date.now(),
   coordinates: DEFAULT_COORDINATES,
-  targetPosition: DEFAULT_COORDINATES,
+  targetPosition: DEFAULT_MAP_POSITION,
   signal: 100,
   temperature: 25,
   speed: 0,
@@ -167,9 +179,9 @@ const normalizeDroneState = (raw: any): DroneState => ({
   flightStatus: (raw?.flightStatus ?? raw?.flight_status ?? 'idle') as FlightStatus,
   battery: typeof raw?.battery === 'number' ? raw.battery : 100,
   position: {
-    latitude: typeof raw?.position?.x === 'number' ? raw.position.x : raw?.position?.latitude ?? 0,
-    longitude: typeof raw?.position?.y === 'number' ? raw.position.y : raw?.position?.longitude ?? 0,
-    altitude: typeof raw?.position?.z === 'number' ? raw.position.z : raw?.position?.altitude ?? 0,
+    xPct: typeof raw?.position?.x === 'number' ? raw.position.x : raw?.position?.latitude ?? 0,
+    yPct: typeof raw?.position?.y === 'number' ? raw.position.y : raw?.position?.longitude ?? 0,
+    zPct: typeof raw?.position?.z === 'number' ? raw.position.z : raw?.position?.altitude ?? 0,
   },
   targetZone: raw?.targetZone ?? raw?.target_zone ?? null,
   waterLevel: typeof raw?.waterLevel === 'number' ? raw.waterLevel : raw?.water_level ?? 100,
@@ -181,6 +193,12 @@ const normalizeCoordinates = (raw: any): Coordinates => ({
   latitude: typeof raw?.latitude === 'number' ? raw.latitude : typeof raw?.x === 'number' ? raw.x : raw?.lat ?? 0,
   longitude: typeof raw?.longitude === 'number' ? raw.longitude : typeof raw?.y === 'number' ? raw.y : raw?.lng ?? 0,
   altitude: typeof raw?.altitude === 'number' ? raw.altitude : typeof raw?.z === 'number' ? raw.z : 0,
+})
+
+const normalizeMapPosition = (raw: any): MapPosition => ({
+  xPct: typeof raw?.x === 'number' ? raw.x : raw?.xPct ?? 0,
+  yPct: typeof raw?.y === 'number' ? raw.y : raw?.yPct ?? 0,
+  zPct: typeof raw?.z === 'number' ? raw.z : raw?.zPct ?? 0,
 })
 
 const normalizeLastReading = (raw: any): TelemetryData['lastReading'] => {
@@ -229,7 +247,7 @@ export const parseTelemetryMessage = (data: string): Partial<TelemetryData> | nu
       const speed = typeof parsed.speed === 'number' ? parsed.speed : DEFAULT_TELEMETRY.speed
       const irrigationStatus = (parsed.irrigationStatus ?? 'idle') as IrrigationStatus
       const nodeReadings = normalizeNodeReadings(parsed.nodeReadings)
-      const targetPosition = parsed.targetPosition ? normalizeCoordinates(parsed.targetPosition) : DEFAULT_COORDINATES
+      const targetPosition = parsed.targetPosition ? normalizeMapPosition(parsed.targetPosition) : DEFAULT_MAP_POSITION
 
       return {
         zones,

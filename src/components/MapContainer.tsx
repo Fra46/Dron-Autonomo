@@ -54,8 +54,8 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
         0,
         Math.min(
           100,
-          typeof telemetry.drone.position.latitude === 'number'
-            ? telemetry.drone.position.latitude
+          typeof telemetry.drone.position.xPct === 'number'
+            ? telemetry.drone.position.xPct
             : 50,
         ),
       ),
@@ -63,13 +63,13 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
         0,
         Math.min(
           100,
-          typeof telemetry.drone.position.longitude === 'number'
-            ? telemetry.drone.position.longitude
+          typeof telemetry.drone.position.yPct === 'number'
+            ? telemetry.drone.position.yPct
             : 95,
         ),
       ),
     }),
-    [telemetry.drone.position.latitude, telemetry.drone.position.longitude]
+    [telemetry.drone.position.xPct, telemetry.drone.position.yPct]
   )
 
   // Posición mostrada (suavizada) para evitar saltos por ejes cuando las
@@ -108,11 +108,11 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
 
   const targetZone = telemetry.drone.targetZone ?? 'centro'
   const targetPosition = useMemo(() => {
-    const hasValidTarget = typeof telemetry.targetPosition?.latitude === 'number' && typeof telemetry.targetPosition?.longitude === 'number'
+    const hasValidTarget = typeof telemetry.targetPosition?.xPct === 'number' && typeof telemetry.targetPosition?.yPct === 'number'
     if (hasValidTarget) {
       return {
-        x: telemetry.targetPosition.latitude,
-        y: telemetry.targetPosition.longitude,
+        x: telemetry.targetPosition.xPct,
+        y: telemetry.targetPosition.yPct,
       }
     }
 

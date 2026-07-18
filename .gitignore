@@ -7,6 +7,11 @@ __v0_jsx-dev-runtime.ts
 .vercel/
 next.user-config.*
 
+# Certificados TLS locales (mkcert) - nunca versionar
+key.pem
+cert.pem
+*.pem
+
 # Environment variables
 .env
 .env.local
