@@ -136,9 +136,9 @@ de telemetría.
 ### 4. Configurar Webots
 
 1. Instalar [Webots R2023b+](https://cyberbotics.com/)
-2. Abrir el proyecto de Webots incluido en `AgroDrone-Webots/`
-3. Abrir el mundo final `AgroDrone-Webots/worlds/AgroDrone4.wbt`
-4. Seleccionar el robot y asignar el controlador `AgroDrone-Webots/controllers/mavic_controller/mavic_controller.py`
+2. Abrir el proyecto de Webots incluido en `webots/`
+3. Abrir el mundo final `webots/worlds/AgroDrone4.wbt`
+4. Seleccionar el robot y asignar el controlador `webots/controllers/mavic_controller/mavic_controller.py`
 5. Iniciar la simulación para que el controlador envíe telemetría al bridge UDP/WebSocket
 
 > 📌 Nota: la simulación final del proyecto es `AgroDrone4.wbt` y el controlador principal usado en la versión de entrega es `mavic_controller.py`.
@@ -194,7 +194,7 @@ npm run dev -- --host
 ## 📁 Estructura del Proyecto
 
 ```
-agrodron-autonomo/
+Dron-autonomo/
 ├── 📁 src/
 │   ├── main.tsx               # Entry point (Vite)
 │   ├── App.tsx                # Componente raíz
@@ -212,10 +212,15 @@ agrodron-autonomo/
 │   ├── sensor_mock.py
 │   ├── sensor_nasa.py
 │   ├── udp_websocket_bridge.py
-│   ├── mavic_controller.py
 │   └── measure_bridge_latency.py   # Mide latencia real UDP → WebSocket
 ├── 📁 docs/
 │   └── TELEMETRY.md           # Documentación detallada del protocolo de telemetría
+├── 📁 webots/
+│   ├── controllers/
+│   │   └── mavic_controller/
+│   │       └── mavic_controller.py
+│   └── worlds/
+│       └── AgroDrone4.wbt
 ├── index.html
 ├── package.json
 ├── vite.config.ts

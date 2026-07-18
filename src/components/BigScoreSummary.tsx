@@ -26,7 +26,7 @@ export default function BigScoreSummary({ humidity }: BigScoreSummaryProps) {
   }, [humidity])
 
   const stats = useMemo(() => {
-    const nextWindow = humidity < 40 ? 'Ahora' : `${Math.ceil((humidity - 40) / 5)} hrs`
+    const nextWindow = humidity < 40 ? 'Ahora' : `${Math.max(1, Math.ceil((humidity - 40) / 5))} hrs`
     const priorityAreas = humidity < 40 ? 4 : humidity < 55 ? 2 : 0
     
     return { nextWindow, priorityAreas }

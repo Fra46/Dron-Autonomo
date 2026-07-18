@@ -26,7 +26,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
 
   const socketRef = useRef<ReturnType<typeof createTelemetrySocket> | null>(null)
   const commandQueueRef = useRef<TelemetrySocketCommand[]>([])
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Parse WebSocket message from the bridge
   const parseWSMessage = useCallback((data: string) => parseTelemetryMessage(data), [])

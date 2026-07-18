@@ -30,7 +30,6 @@ import asyncio
 import json
 import socket
 import time
-import os
 from datetime import datetime
 from typing import Set, Optional
 
@@ -306,8 +305,6 @@ async def udp_receiver():
             print(f"[UDP] Error en receiver: {e}")
             await asyncio.sleep(0.1)
 
-SHARED_TOKEN = os.environ.get("AGRODRONE_CMD_TOKEN")  # opcional; si no está, no se exige
-
 async def websocket_handler(websocket):
     connected_clients.add(websocket)
     client_ip = websocket.remote_address[0] if websocket.remote_address else "unknown"
@@ -324,11 +321,6 @@ async def websocket_handler(websocket):
                 continue
 
             cmd_type = cmd.get("type")
-
-            if SHARED_TOKEN and cmd_type in ("start_mission", "stop_mission", "emergency_stop", "set_mode"):
-                if cmd.get("token") != SHARED_TOKEN:
-                    print(f"[WS] Comando rechazado (token invalido): {cmd_type}")
-                    continue
 
             if cmd_type == "request_status":
                 reply = build_snapshot()

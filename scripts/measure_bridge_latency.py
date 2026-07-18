@@ -92,7 +92,7 @@ def summarize(latencies):
         "stdev_ms": stdev(latencies) if len(latencies) > 1 else 0.0,
         "min_ms": min(latencies),
         "max_ms": max(latencies),
-        "p95_ms": sorted(latencies)[int(len(latencies) * 0.95) - 1],
+        "p95_ms": sorted(latencies)[int(len(latencies) * 0.95) - 1] if len(latencies) >= 20 else None,
         "p99_ms": sorted(latencies)[int(len(latencies) * 0.99) - 1] if len(latencies) >= 100 else None,
     }
 
