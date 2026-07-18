@@ -30,6 +30,7 @@ import asyncio
 import json
 import socket
 import time
+import os
 from datetime import datetime
 from typing import Set, Optional
 
@@ -63,6 +64,7 @@ drone_state = {
     "speed": 0.0,
     "altitude": 0.0,
     "modo": "auto",
+    "missionProgress": 0.0,
 }
 target_position = {"x": 50.0, "y": 80.0, "z": 0.0}
 last_drone_packet_ts: Optional[float] = None
@@ -240,6 +242,8 @@ def procesar_telemetria_dron(datos: dict):
         drone_state["altitude"] = float(datos["altitude"])
     if "modo" in datos:
         drone_state["modo"] = datos["modo"]
+    if "missionProgress" in datos:
+        drone_state["missionProgress"] = float(datos["missionProgress"])
     if "targetZone" in datos:
         drone_state["targetZone"] = datos["targetZone"]
     if isinstance(datos.get("position"), dict):
@@ -302,6 +306,7 @@ async def udp_receiver():
             print(f"[UDP] Error en receiver: {e}")
             await asyncio.sleep(0.1)
 
+SHARED_TOKEN = os.environ.get("AGRODRONE_CMD_TOKEN")  # opcional; si no está, no se exige
 
 async def websocket_handler(websocket):
     connected_clients.add(websocket)
@@ -319,6 +324,12 @@ async def websocket_handler(websocket):
                 continue
 
             cmd_type = cmd.get("type")
+
+            if SHARED_TOKEN and cmd_type in ("start_mission", "stop_mission", "emergency_stop", "set_mode"):
+                if cmd.get("token") != SHARED_TOKEN:
+                    print(f"[WS] Comando rechazado (token invalido): {cmd_type}")
+                    continue
+
             if cmd_type == "request_status":
                 reply = build_snapshot()
                 # Eco del timestamp del cliente (medido con SU propio reloj de

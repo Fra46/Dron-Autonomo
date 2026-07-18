@@ -37,10 +37,12 @@ export interface DroneState {
   position: MapPosition
   targetZone: string | null
   waterLevel: number
-  // Altitud real en metros reportada por el controlador (independiente de
-  // `position.zPct`, que es siempre 0 porque el mapa de la PWA es 2D).
   altitude: number
   mode: OperationMode
+  // Progreso (0.0-1.0) de la FASE actual de vuelo, calculado en
+  // mavic_controller.py (ver calcular_progreso_mision). No representa el
+  // progreso de la mision completa si hay varias zonas en cola.
+  missionProgress: number
 }
 
 export interface TelemetryNodeReading {
@@ -121,6 +123,7 @@ export const DEFAULT_TELEMETRY: TelemetryData = {
     waterLevel: 100,
     altitude: 0,
     mode: 'auto',
+    missionProgress: 0,
   },
   lastReading: null,
   history: [],
@@ -187,6 +190,7 @@ const normalizeDroneState = (raw: any): DroneState => ({
   waterLevel: typeof raw?.waterLevel === 'number' ? raw.waterLevel : raw?.water_level ?? 100,
   altitude: typeof raw?.altitude === 'number' ? raw.altitude : 0,
   mode: raw?.modo === 'manual' || raw?.mode === 'manual' ? 'manual' : 'auto',
+  missionProgress: typeof raw?.missionProgress === 'number' ? raw.missionProgress : 0,
 })
 
 const normalizeCoordinates = (raw: any): Coordinates => ({

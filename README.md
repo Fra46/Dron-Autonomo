@@ -245,6 +245,16 @@ agrodron-autonomo/
 
 ## 🔧 Configuración
 
+### ⚠️ Nota de seguridad
+
+El puente UDP-WebSocket (`udp_websocket_bridge.py`) y el puerto de comandos
+del controlador (5006/UDP) escuchan en `0.0.0.0` **sin autenticación**.
+Cualquier dispositivo en la misma red puede enviar comandos de misión
+(`start_mission`, `emergency_stop`, etc.) al dron. Esto es aceptable para una
+demo en una red aislada/controlada, pero **no debe exponerse en una red
+abierta o en producción** sin agregar autenticación (token compartido, TLS
+con verificación de cliente, o restringir el bind a la IP del bridge).
+
 ### Variables de Entorno
 
 Crear archivo `.env.local`:

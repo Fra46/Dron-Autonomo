@@ -168,24 +168,16 @@ export default function MissionControl() {
           <div className="d-flex justify-content-between align-items-center">
             <small style={{ color: 'var(--text-secondary)' }}>Progreso de misión</small>
             <small style={{ color: 'var(--lv3)' }}>
-              {isReturning ? 'Regresando...' : 'En curso...'}
+              {isReturning ? 'Regresando... ' : ''}
+              {Math.round((telemetry.drone.missionProgress ?? 0) * 100)}%
             </small>
           </div>
           <div className="score-bar-container mt-2">
             <div
               className="score-bar-fill lv3"
-              style={{
-                width: '0%',
-                animation: 'progress-fill 30s linear forwards',
-              }}
+              style={{ width: `${Math.max(4, (telemetry.drone.missionProgress ?? 0) * 100)}%` }}
             />
           </div>
-          <style>{`
-            @keyframes progress-fill {
-              from { width: 0%; }
-              to { width: 100%; }
-            }
-          `}</style>
         </div>
       )}
     </div>

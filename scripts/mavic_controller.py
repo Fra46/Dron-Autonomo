@@ -265,6 +265,14 @@ modo        = MODO_AUTO
 
 cola_zonas     = []                              
 ultima_humedad = {z: None for z in COORDENADAS_ZONAS}  
+
+# Distancias de referencia para calcular progreso real (0.0-1.0) de la FASE
+# actual de vuelo. Se fijan al ENTRAR a NAVEGANDO/RETORNO y se comparan contra
+# la distancia restante en cada paso. None mientras no aplique a la fase actual.
+
+distancia_inicial_navegando = None
+distancia_inicial_retorno = None
+
 nivel_agua_estimado = 100.0
 
 ESTADO_A_FRONTEND = {
@@ -320,6 +328,7 @@ def enviar_telemetria(x_global, y_global, actual_altitude, speed_mps):
         "position": proyectar_a_porcentaje(x_global, y_global),
         "altitude": round(actual_altitude, 2),
         "modo": modo,
+        "missionProgress": round(calcular_progreso_mision(x_global, y_global, actual_altitude), 3),
     }
     if target_pct is not None:
         paquete["targetPosition"] = target_pct
@@ -329,16 +338,65 @@ def enviar_telemetria(x_global, y_global, actual_altitude, speed_mps):
     except Exception as exc:
         print(f"  No se pudo enviar telemetria al bridge: {exc}")
 
-def avanzar_a_siguiente_zona_o_retorno(motivo: str):
-    global objetivo_zona, objetivo_xy, estado, timer_riego, cola_zonas, integral_x, integral_y
+def calcular_progreso_mision(x_actual: float, y_actual: float, altura_actual: float) -> float:
+    """Progreso (0.0-1.0) de la FASE actual del vuelo (no de la mision
+    completa, ya que esta puede visitar varias zonas en cola con
+    avanzar_a_siguiente_zona_o_retorno). Usado por MissionControl.tsx para
+    la barra de progreso real en vez de una animacion CSS fija.
+
+    NOTA: en ASCENSO/DESCENSO se usa ALTURA_OBJETIVO como referencia, lo cual
+    es una aproximacion razonable salvo en el caso borde de un emergency_stop
+    a mitad de ASCENSO (donde el descenso empieza desde una altura menor a
+    ALTURA_OBJETIVO); no afecta la logica de vuelo, solo el numero mostrado.
+    """
+    if estado == IDLE:
+        return 0.0
+
+    if estado == ASCENSO:
+        if ALTURA_OBJETIVO <= 0:
+            return 1.0
+        return max(0.0, min(1.0, altura_actual / ALTURA_OBJETIVO))
+
+    if estado == NAVEGANDO:
+        if not distancia_inicial_navegando:
+            return 0.0
+        error_x = objetivo_xy[0] - x_actual
+        error_y = objetivo_xy[1] - y_actual
+        distancia_restante = math.sqrt(error_x**2 + error_y**2)
+        return max(0.0, min(1.0, 1.0 - (distancia_restante / distancia_inicial_navegando)))
+
+    if estado == REGANDO:
+        if TIEMPO_RIEGO_S <= 0:
+            return 1.0
+        return max(0.0, min(1.0, timer_riego / TIEMPO_RIEGO_S))
+
+    if estado == RETORNO:
+        if not distancia_inicial_retorno:
+            return 0.0
+        error_x = objetivo_xy[0] - x_actual
+        error_y = objetivo_xy[1] - y_actual
+        distancia_restante = math.sqrt(error_x**2 + error_y**2)
+        return max(0.0, min(1.0, 1.0 - (distancia_restante / distancia_inicial_retorno)))
+
+    if estado == DESCENSO:
+        if ALTURA_OBJETIVO <= 0:
+            return 1.0
+        return max(0.0, min(1.0, 1.0 - (height_desired / ALTURA_OBJETIVO)))
+
+    return 0.0
+
+def avanzar_a_siguiente_zona_o_retorno(motivo: str, x_actual: float, y_actual: float):
+    global objetivo_zona, objetivo_xy, estado, timer_riego, cola_zonas
+    global distancia_inicial_navegando, distancia_inicial_retorno
 
     if cola_zonas:
         objetivo_zona = cola_zonas.pop(0)
         objetivo_xy = COORDENADAS_ZONAS.get(objetivo_zona, [0.0, 0.0])
         timer_riego = 0.0
-        integral_x = 0.0
-        integral_y = 0.0
         estado = NAVEGANDO
+        error_x0 = objetivo_xy[0] - x_actual
+        error_y0 = objetivo_xy[1] - y_actual
+        distancia_inicial_navegando = math.sqrt(error_x0**2 + error_y0**2) or 0.001
         print(f"  {motivo} Zonas pendientes en cola: siguiente → {objetivo_zona.upper()} (quedan {len(cola_zonas)}).")
     else:
         if modo == MODO_AUTO:
@@ -352,17 +410,19 @@ def avanzar_a_siguiente_zona_o_retorno(motivo: str):
                 objetivo_xy = COORDENADAS_ZONAS.get(objetivo_zona, [0.0, 0.0])
                 cola_zonas = zonas_secas_nuevas[1:]  
                 timer_riego = 0.0
-                integral_x = 0.0
-                integral_y = 0.0
                 estado = NAVEGANDO
+                error_x0 = objetivo_xy[0] - x_actual
+                error_y0 = objetivo_xy[1] - y_actual
+                distancia_inicial_navegando = math.sqrt(error_x0**2 + error_y0**2) or 0.001
                 print(f"  {motivo} Nuevas zonas secas detectadas: {objetivo_zona.upper()}")
                 return
         
         objetivo_xy = BASE_XY.copy()
         objetivo_zona = None
-        integral_x = 0.0
-        integral_y = 0.0
         estado = RETORNO
+        error_x0 = objetivo_xy[0] - x_actual
+        error_y0 = objetivo_xy[1] - y_actual
+        distancia_inicial_retorno = math.sqrt(error_x0**2 + error_y0**2) or 0.001
         print(f"  {motivo} No quedan zonas pendientes. Iniciando RETORNO.")
 
 # Configurar valores para cálculo inicial de velocidad
@@ -395,8 +455,6 @@ while robot.step(timestep) != -1:
                     if z != zona and h is not None and requiere_riego(h)
                 ]
                 height_desired = ALTURA_OBJETIVO
-                integral_x     = 0.0
-                integral_y     = 0.0
                 estado         = ASCENSO
                 print(f"  [PWA] start_mission → zona {zona.upper()}. Iniciando ASCENSO.")
 
@@ -406,9 +464,10 @@ while robot.step(timestep) != -1:
                 cola_zonas  = []
                 objetivo_xy = BASE_XY.copy()
                 objetivo_zona = None
-                integral_x  = 0.0
-                integral_y  = 0.0
                 estado      = RETORNO
+                error_x0 = objetivo_xy[0] - past_x_global
+                error_y0 = objetivo_xy[1] - past_y_global
+                distancia_inicial_retorno = math.sqrt(error_x0**2 + error_y0**2) or 0.001
 
         elif tipo == "emergency_stop":
             if estado != IDLE:
@@ -446,7 +505,9 @@ while robot.step(timestep) != -1:
 
             elif estado == REGANDO:
                 if zona == objetivo_zona and not requiere_riego(humedad):
-                    avanzar_a_siguiente_zona_o_retorno(f"Zona {zona.upper()} ya no requiere riego.")
+                    avanzar_a_siguiente_zona_o_retorno(
+                        f"Zona {zona.upper()} ya no requiere riego.", past_x_global, past_y_global
+                    )
 
     except BlockingIOError:
         pass
@@ -516,7 +577,10 @@ while robot.step(timestep) != -1:
             error_z = height_desired - actual_altitude
             if abs(error_z) < TOLERANCIA_Z:
                 print(f"  Altura {actual_altitude:.2f}m alcanzada. Transitando a NAVEGANDO")
-                estado = NAVEGANDO   
+                error_x0 = objetivo_xy[0] - x_global
+                error_y0 = objetivo_xy[1] - y_global
+                distancia_inicial_navegando = math.sqrt(error_x0**2 + error_y0**2) or 0.001
+                estado = NAVEGANDO   # Altura lista → empezar a moverse horizontalmente
             else:
                 desired_vx = 0.0
                 desired_vy = 0.0
@@ -581,7 +645,9 @@ while robot.step(timestep) != -1:
 
             timer_riego += dt
             if timer_riego >= TIEMPO_RIEGO_S:
-                avanzar_a_siguiente_zona_o_retorno(f"Riego completado ({TIEMPO_RIEGO_S}s) en {objetivo_zona.upper()}.")
+                avanzar_a_siguiente_zona_o_retorno(
+                    f"Riego completado ({TIEMPO_RIEGO_S}s) en {objetivo_zona.upper()}.", x_global, y_global
+                )
 
         elif estado == RETORNO:
             error_x    = objetivo_xy[0] - x_global
