@@ -90,7 +90,7 @@ export default function MissionControl() {
             }
           }}
         >
-          <span style={{ marginRight: '0.5rem' }}>
+          <span className="mission-btn-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               {missionActive ? (
                 <rect x="6" y="6" width="12" height="12" rx="2" />
@@ -107,16 +107,7 @@ export default function MissionControl() {
         <button
           type="button"
           onClick={() => emergencyStop()}
-          style={{
-            width: '100%',
-            marginTop: '0.5rem',
-            padding: '0.6rem',
-            borderRadius: 'var(--border-radius-sm)',
-            border: '1px solid var(--lv0)',
-            background: 'transparent',
-            color: 'var(--lv0)',
-            fontWeight: 600,
-          }}
+          className="emergency-stop-btn"
         >
           Parada de emergencia
         </button>
@@ -130,29 +121,13 @@ export default function MissionControl() {
           requestStatus()
           setTimeout(() => setSyncing(false), 800)
         }}
-        style={{
-          width: '100%',
-          marginTop: '0.5rem',
-          padding: '0.5rem',
-          borderRadius: 'var(--border-radius-sm)',
-          border: '1px solid var(--text-muted)',
-          background: 'transparent',
-          color: 'var(--text-secondary)',
-          fontSize: '0.85rem',
-        }}
+        className="sync-status-btn"
       >
         {syncing ? 'Sincronizando…' : 'Sincronizar estado'}
       </button>
 
       {!missionActive && (
-        <p
-          className="text-center mt-3 mb-0"
-          style={{
-            fontSize: '0.875rem',
-            color: 'var(--text-muted)',
-            fontStyle: 'italic',
-          }}
-        >
+        <p className="mission-idle-hint">
           {isAuto
             ? 'En espera: despegará solo en cuanto una zona baje de humedad.'
             : 'El dron despegará, regará la zona seleccionada y regresará a base.'}
@@ -160,14 +135,14 @@ export default function MissionControl() {
       )}
 
       {missionActive && (
-        <div className="mt-3">
+        <div className="mission-progress mt-3">
           <div className="d-flex justify-content-between align-items-center mb-2">
-            <small style={{ color: 'var(--text-secondary)' }}>Zona objetivo</small>
-            <small style={{ color: 'var(--lv4)' }}>{ZONE_LABELS[activeTargetZone]}</small>
+            <small className="mission-progress-label">Zona objetivo</small>
+            <small className="mission-progress-zone">{ZONE_LABELS[activeTargetZone]}</small>
           </div>
           <div className="d-flex justify-content-between align-items-center">
-            <small style={{ color: 'var(--text-secondary)' }}>Progreso de misión</small>
-            <small style={{ color: 'var(--lv3)' }}>
+            <small className="mission-progress-label">Progreso de misión</small>
+            <small className="mission-progress-value">
               {isReturning ? 'Regresando... ' : ''}
               {Math.round((telemetry.drone.missionProgress ?? 0) * 100)}%
             </small>

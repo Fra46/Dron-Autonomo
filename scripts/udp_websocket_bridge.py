@@ -172,18 +172,24 @@ async def broadcast_snapshot():
         return_exceptions=True,
     )
 
+VALID_ZONES = frozenset(zone_readings.keys())
 
 def procesar_lectura_suelo(datos: dict):
-    """Fusiona una lectura real de humedad de suelo (sensor_nasa.py /
-    sensor_mock.py) en el estado agregado, aplicando el efecto de riego
-    acumulado (irrigation_boost) si el dron ha estado regando esa zona."""
     global last_reading
 
-    zona = datos.get("zona", "centro")
-    if zona not in zone_readings:
-        zona = "centro"
+    zona_recibida = datos.get("zona", "centro")
+    if zona_recibida not in VALID_ZONES:
+        print(f"[UDP] Zona desconocida '{zona_recibida}' en paquete de suelo; "
+              f"descartando paquete (no se usa fallback silencioso a 'centro').")
+        return
+    zona = zona_recibida
 
-    humedad_cruda = float(datos["humedad"])
+    try:
+        humedad_cruda = float(datos["humedad"])
+    except (TypeError, ValueError):
+        print(f"[UDP] Lectura de suelo descartada: humedad inválida {datos.get('humedad')!r} "
+            f"para zona {datos.get('zona')!r}")
+        return
     boost = irrigation_boost.get(zona, 0.0)
     humedad = min(100.0, humedad_cruda + boost)
     # La etiqueta la recalculamos aqui (no la que trae el paquete) porque
@@ -224,25 +230,28 @@ def procesar_lectura_suelo(datos: dict):
     except Exception as exc:
         print(f"[CTRL] No se pudo reenviar lectura de suelo: {exc}")
 
+def _safe_float(datos: dict, key: str, current_value: float) -> float:
+    """Devuelve el nuevo valor si es convertible, o el valor actual si no."""
+    if key not in datos:
+        return current_value
+    try:
+        return float(datos[key])
+    except (TypeError, ValueError):
+        print(f"[UDP] Campo '{key}' inválido en telemetría del dron: {datos[key]!r}; "
+              f"se conserva el valor anterior ({current_value}).")
+        return current_value
 
 def procesar_telemetria_dron(datos: dict):
-    """Fusiona un paquete real de telemetria enviado por
-    mavic_controller.py en el estado agregado del dron."""
     global last_drone_packet_ts
 
     drone_state["flightStatus"] = datos.get("flightStatus", drone_state["flightStatus"])
-    if "battery" in datos:
-        drone_state["battery"] = float(datos["battery"])
-    if "waterLevel" in datos:
-        drone_state["waterLevel"] = float(datos["waterLevel"])
-    if "speed" in datos:
-        drone_state["speed"] = float(datos["speed"])
-    if "altitude" in datos:
-        drone_state["altitude"] = float(datos["altitude"])
+    drone_state["battery"] = _safe_float(datos, "battery", drone_state["battery"])
+    drone_state["waterLevel"] = _safe_float(datos, "waterLevel", drone_state["waterLevel"])
+    drone_state["speed"] = _safe_float(datos, "speed", drone_state["speed"])
+    drone_state["altitude"] = _safe_float(datos, "altitude", drone_state["altitude"])
+    drone_state["missionProgress"] = _safe_float(datos, "missionProgress", drone_state["missionProgress"])
     if "modo" in datos:
         drone_state["modo"] = datos["modo"]
-    if "missionProgress" in datos:
-        drone_state["missionProgress"] = float(datos["missionProgress"])
     if "targetZone" in datos:
         drone_state["targetZone"] = datos["targetZone"]
     if isinstance(datos.get("position"), dict):

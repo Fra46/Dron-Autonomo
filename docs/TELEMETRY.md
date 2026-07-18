@@ -241,7 +241,7 @@ llegue la siguiente lectura de esa zona y tenga que volver a despegar.
 ## Lógica Difusa del Controlador (igual que el paper, ecuaciones 1-3)
 
 ```python
-+UMBRAL_ACTIVACION = 0.35  # theta, AJUSTADO respecto al paper (Tabla 2 dice 0.65)
+UMBRAL_ACTIVACION = 0.35  # theta, AJUSTADO respecto al paper (Tabla 2 dice 0.65)
 
 def mu_dry(h):        # ecuacion 1: 1 si h<=30, (50-h)/20 si 30<h<50, 0 si h>=50
     ...

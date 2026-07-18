@@ -482,8 +482,17 @@ while robot.step(timestep) != -1:
                 print(f"  [PWA] Modo cambiado a {modo.upper()}")
 
         elif "zona" in datos and "humedad" in datos:
-            humedad = float(datos["humedad"])
-            zona    = datos.get("zona", "centro")
+            zona = datos.get("zona", "centro")
+            if zona not in ultima_humedad:
+                print(f"  [UDP] Zona desconocida '{zona}' recibida del bridge; paquete ignorado.")
+                continue
+
+            try:
+                humedad = float(datos["humedad"])
+            except (TypeError, ValueError):
+                print(f"  [UDP] Valor de humedad inválido para zona '{zona}': {datos.get('humedad')!r}")
+                continue
+
             ultima_humedad[zona] = humedad
 
             if estado == IDLE:

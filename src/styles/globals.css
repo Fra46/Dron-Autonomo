@@ -798,3 +798,55 @@ body {
   color: var(--text-primary);
   box-shadow: 0 0 0 0.25rem rgba(255, 94, 87, 0.25);
 }
+
+/* ============================================
+   MissionControl — clases extraídas de estilos inline
+   Pegar al final de src/styles/globals.css
+   ============================================ */
+
+.mission-btn-icon {
+  margin-right: 0.5rem;
+}
+
+.emergency-stop-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.6rem;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--lv0);
+  background: transparent;
+  color: var(--lv0);
+  font-weight: 600;
+}
+
+.sync-status-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--text-muted);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.mission-idle-hint {
+  text-align: center;
+  margin-top: 1rem;
+  margin-bottom: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.mission-progress-label {
+  color: var(--text-secondary);
+}
+
+.mission-progress-zone {
+  color: var(--lv4);
+}
+
+.mission-progress-value {
+  color: var(--lv3);
+}
