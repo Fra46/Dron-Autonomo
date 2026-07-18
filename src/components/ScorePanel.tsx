@@ -1,35 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useTelemetryContext } from '@/contexts/TelemetryContext'
+import { calculateHumidityLevel } from '@/lib/telemetry'
+import { HUMIDITY_COLORS, HUMIDITY_LEVEL_LABELS } from '@/lib/uiUtils'
 
-const getHumidityLevel = (humidity: number) => {
-  if (humidity < 25) return 'lv0'
-  if (humidity < 40) return 'lv1'
-  if (humidity < 55) return 'lv2'
-  if (humidity < 70) return 'lv3'
-  if (humidity < 85) return 'lv4'
-  return 'lv5'
-}
-
-const getLevelLabel = (level: string) => {
-  const labels: Record<string, string> = {
-    lv0: 'Crítico',
-    lv1: 'Bajo',
-    lv2: 'Medio Bajo',
-    lv3: 'Óptimo',
-    lv4: 'Alto',
-    lv5: 'Saturado'
-  }
-  return labels[level] || 'Desconocido'
-}
-
-const HUMIDITY_COLORS: Record<string, string> = {
-  lv0: '#FF3B30',
-  lv1: '#FF9500',
-  lv2: '#FFCC00',
-  lv3: '#34C759',
-  lv4: '#00C7BE',
-  lv5: '#AF52DE',
-}
+const getHumidityLevel = calculateHumidityLevel
+const getLevelLabel = (level: string) =>
+  HUMIDITY_LEVEL_LABELS[level as keyof typeof HUMIDITY_LEVEL_LABELS] ?? 'Desconocido'
 
 export default function ScorePanel() {
   const { telemetry } = useTelemetryContext()

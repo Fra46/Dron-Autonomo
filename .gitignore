@@ -17,6 +17,7 @@ node_modules
 .next/
 .DS_Store
 dist/
+dev-dist/
 
 # Build output (Vite)
 *.local

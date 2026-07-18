@@ -302,7 +302,9 @@ por la PWA vía WebSocket y reenviados por el bridge al controlador por UDP:
 
 Implementada en `mavic_controller.py` exactamente como en las ecuaciones
 (1)-(3) del paper: se activa una misión cuando `μ_dry(h) + μ_very_dry(h) > θ`,
-con `θ = 0.65` (calibrado empíricamente, ver Tabla 2 del paper).
+con `θ = 0.35` en la implementación actual (el paper, Tabla 2, especifica
++`θ = 0.65`; se redujo para activar riego preventivo en niveles de humedad
++medios — ver comentario en `mavic_controller.py`).
 
 ### Niveles de Humedad (color de interfaz)
 

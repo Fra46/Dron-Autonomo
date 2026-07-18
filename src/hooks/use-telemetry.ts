@@ -20,8 +20,6 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
     wsUrl = 'ws://127.0.0.1:8765',
   } = options
 
-  console.log('[Telemetry] Hook inicializado con opciones:', { wsUrl })
-
   const [telemetry, setTelemetry] = useState<TelemetryData>(DEFAULT_TELEMETRY)
   const [isConnected, setIsConnected] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
@@ -244,6 +242,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
   // Initialize
   useEffect(() => {
     console.log('[Telemetry] useEffect ejecutado')
+    console.log('[Telemetry] Hook inicializado con opciones:', { wsUrl })
 
     const connectionDelay = setTimeout(() => {
       console.log('[Telemetry] Llamando a connect()')

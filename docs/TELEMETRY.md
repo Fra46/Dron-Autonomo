@@ -241,17 +241,25 @@ llegue la siguiente lectura de esa zona y tenga que volver a despegar.
 ## Lógica Difusa del Controlador (igual que el paper, ecuaciones 1-3)
 
 ```python
-UMBRAL_ACTIVACION = 0.65  # theta, calibrado empiricamente (paper, Tabla 2)
++UMBRAL_ACTIVACION = 0.35  # theta, AJUSTADO respecto al paper (Tabla 2 dice 0.65)
 
 def mu_dry(h):        # ecuacion 1: 1 si h<=30, (50-h)/20 si 30<h<50, 0 si h>=50
     ...
-
+ 
 def mu_very_dry(h):    # ecuacion 2: 1 si h<=20, (35-h)/15 si 20<h<35, 0 si h>=35
     ...
-
+ 
 def requiere_riego(humedad):
     return (mu_dry(humedad) + mu_very_dry(humedad)) > UMBRAL_ACTIVACION
 ```
++
++> ⚠️ **Nota de implementación:** el paper (sección 2.3, Tabla 2) especifica
++> `theta = 0.65`. En la implementación actual (`mavic_controller.py`) se redujo
++> a `0.35` para que el dron riegue preventivamente cuando la humedad está en
++> nivel "medio" (~40-55%), en vez de esperar a que baje a "bajo" (~25-40%).
++> Esto evita transiciones bruscas de humedad de nivel medio directo a crítico.
++> Si necesitas replicar exactamente el paper, cambia `UMBRAL_ACTIVACION` de
++> vuelta a `0.65`.
 
 ## Comandos desde la PWA
 

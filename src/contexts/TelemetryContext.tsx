@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, ReactNode } from 'react'
+import { createContext, useContext, ReactNode, useEffect } from 'react'
 import { useTelemetry } from '@/hooks/use-telemetry'
 import type { TelemetryData } from '@/lib/telemetry'
 
@@ -19,10 +19,13 @@ interface TelemetryContextType {
 const TelemetryContext = createContext<TelemetryContextType | null>(null)
 
 export function TelemetryProvider({ children }: { children: ReactNode }) {
-  console.log('[TelemetryProvider] Inicializando...')
   const telemetryState = useTelemetry({
     wsUrl: typeof window !== 'undefined' ? `ws://${window.location.hostname}:8765` : '',
   })
+
+  useEffect(() => {
+    console.log('[TelemetryProvider] Inicializando...')
+  }, [])
 
   return (
     <TelemetryContext.Provider value={telemetryState}>

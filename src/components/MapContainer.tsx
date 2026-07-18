@@ -1,6 +1,8 @@
 import { useMemo, useEffect, useRef, useCallback, useState } from 'react'
 import { ButtonGroup, Button } from 'react-bootstrap'
 import { useTelemetryContext } from '@/contexts/TelemetryContext'
+import { calculateHumidityLevel } from '@/lib/telemetry'
+import { HUMIDITY_COLORS } from '@/lib/uiUtils'
 
 interface MapContainerProps {
   missionActive: boolean
@@ -24,28 +26,12 @@ const ZONE_LAYOUT: Record<ZoneNode['id'], { x: number; y: number }> = {
 // Posición de la base (agrícola) - Al OESTE de zona centro
 const BASE_POSITION = { x: 15, y: 50 }  // x < 50 = oeste, y = 50 = mismo nivel que centro
 
-const HUMIDITY_COLORS: Record<string, string> = {
-  lv0: '#FF3B30',
-  lv1: '#FF9500',
-  lv2: '#FFCC00',
-  lv3: '#34C759',
-  lv4: '#00C7BE',
-  lv5: '#AF52DE',
-}
-
 const getHumidityColor = (humidity: number, forCanvas = false) => {
-  const color = HUMIDITY_COLORS[getHumidityLevel(humidity)]
+  const color = HUMIDITY_COLORS[calculateHumidityLevel(humidity)]
   return forCanvas ? color : `var(--${getHumidityLevel(humidity)})`
 }
 
-const getHumidityLevel = (humidity: number) => {
-  if (humidity < 25) return 'lv0'
-  if (humidity < 40) return 'lv1'
-  if (humidity < 55) return 'lv2'
-  if (humidity < 70) return 'lv3'
-  if (humidity < 85) return 'lv4'
-  return 'lv5'
-}
+const getHumidityLevel = calculateHumidityLevel
 
 export default function MapContainer({ missionActive, onHumidityChange }: MapContainerProps) {
   const { telemetry } = useTelemetryContext()
