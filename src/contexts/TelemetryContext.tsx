@@ -20,9 +20,12 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   const telemetryState = useTelemetry({
     wsUrl: typeof window !== 'undefined'
       ? (() => {
-          const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
           const host = import.meta.env.VITE_WS_HOST || window.location.hostname
           const preferred = parseInt(import.meta.env.VITE_WS_PORT || '8765', 10) || 8765
+          const explicitProtocol = (import.meta.env.VITE_WS_PROTOCOL as string | undefined)?.toLowerCase()
+          const isLocalLoopback = ['localhost', '127.0.0.1', '::1'].includes(host)
+          const isPrivateLan = host.startsWith('192.168.') || host.startsWith('10.') || host.startsWith('172.')
+          const protocol = explicitProtocol || (window.location.protocol === 'https:' && isLocalLoopback ? 'wss' : 'ws')
           // Match the bridge's default max attempts (20) so the PWA will try the
           // same port range the bridge may have selected from.
           const RANGE = 20

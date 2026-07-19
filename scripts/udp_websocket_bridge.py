@@ -161,18 +161,22 @@ def _find_ssl_cert_pair() -> tuple[Path, Path] | None:
 
 
 SSL_CONTEXT: ssl.SSLContext | None = None
-cert_pair = _find_ssl_cert_pair()
-if cert_pair is not None:
-    CERT_FILE, KEY_FILE = cert_pair
-    try:
-        SSL_CONTEXT = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        SSL_CONTEXT.load_cert_chain(certfile=str(CERT_FILE), keyfile=str(KEY_FILE))
-        print(f"[TLS] Usando certificados: {CERT_FILE} / {KEY_FILE}")
-    except Exception as exc:
-        print(f"[TLS] No se pudo cargar el contexto TLS: {exc}")
-        SSL_CONTEXT = None
+USE_WSS = str(os.environ.get("AGRODRONE_USE_WSS", "")).lower() in ("1", "true", "yes")
+if USE_WSS:
+    cert_pair = _find_ssl_cert_pair()
+    if cert_pair is not None:
+        CERT_FILE, KEY_FILE = cert_pair
+        try:
+            SSL_CONTEXT = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            SSL_CONTEXT.load_cert_chain(certfile=str(CERT_FILE), keyfile=str(KEY_FILE))
+            print(f"[TLS] Usando certificados: {CERT_FILE} / {KEY_FILE}")
+        except Exception as exc:
+            print(f"[TLS] No se pudo cargar el contexto TLS: {exc}")
+            SSL_CONTEXT = None
+    else:
+        print("[TLS] No se encontró ningún par de certificados TLS válido; el bridge funcionará en ws://")
 else:
-    print("[TLS] No se encontró ningún par de certificados TLS válido; el bridge funcionará en ws://")
+    print("[TLS] TLS deshabilitado por defecto para conexiones locales; el bridge funcionará en ws://")
 
 ZONE_NAMES = ("norte", "centro", "sur")
 
