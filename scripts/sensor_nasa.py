@@ -16,7 +16,11 @@ from earthdata_credentials import resolve_earthdata_credentials
 from shared_token_credentials import resolve_shared_token
 
 resolve_shared_token()
-SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN", "")
+SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN", "") or os.environ.get("VITE_SHARED_TOKEN", "")
+if SHARED_TOKEN:
+    print(f"[TOKEN] Sensor NASA usando token: {SHARED_TOKEN[:4]}***")
+else:
+    print("[TOKEN] Sensor NASA sin token configurado")
 
 DESTINO_IP     = "127.0.0.1"
 DESTINO_PUERTO = 5005

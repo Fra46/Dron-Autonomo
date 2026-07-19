@@ -31,7 +31,20 @@ import json
 import socket
 import time
 import os
+import ssl
+from pathlib import Path
 from shared_token_credentials import resolve_shared_token
+
+
+def encontrar_puerto_libre(inicio: int = 8765, max_intentos: int = 20) -> int:
+    for puerto in range(inicio, inicio + max_intentos):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("0.0.0.0", puerto))
+                return puerto
+            except OSError:
+                continue
+    raise RuntimeError("No se encontró un puerto WebSocket libre")
 from datetime import datetime
 from typing import Set, Optional
 
@@ -41,18 +54,102 @@ import websockets
 UDP_HOST = "0.0.0.0"
 UDP_PORT = 5005          # Entrada: sensores de suelo + telemetria del dron
 WS_HOST = "0.0.0.0"
-WS_PORT = 8765           # Salida: PWA
+WS_PORT = encontrar_puerto_libre(8765)
 CONTROLLER_HOST = "127.0.0.1"
 CONTROLLER_CMD_PORT = 5006   # Salida: reenvio de lecturas de suelo + comandos de mision
+
+def _local_address_candidates() -> set[str]:
+    candidates = {"localhost", "127.0.0.1"}
+    try:
+        hostname = socket.gethostname()
+        for info in socket.getaddrinfo(hostname, None, family=socket.AF_INET):
+            candidates.add(info[4][0])
+        fqdn = socket.getfqdn()
+        if fqdn:
+            candidates.add(fqdn)
+    except Exception:
+        pass
+    return candidates
+
+
+def _cert_sans(cert_path: Path) -> set[str]:
+    try:
+        cert_info = ssl._ssl._test_decode_cert(str(cert_path))
+        return {value for key, value in cert_info.get('subjectAltName', ())}
+    except Exception:
+        return set()
+
+
+def _find_ssl_cert_pair() -> tuple[Path, Path] | None:
+    repo_root = Path(__file__).resolve().parent.parent
+    local_addresses = _local_address_candidates()
+    candidates: list[tuple[Path, Path, bool]] = []
+
+    for cert_path in sorted(repo_root.glob('*.pem')):
+        if cert_path.name.endswith('-key.pem'):
+            continue
+
+        key_path = repo_root / f"{cert_path.stem}-key.pem"
+        if not key_path.exists():
+            continue
+
+        sans = _cert_sans(cert_path)
+        matches = bool(local_addresses & sans)
+        candidates.append((cert_path, key_path, matches))
+
+    for cert_path, key_path, matches in candidates:
+        if matches:
+            return cert_path, key_path
+
+    return candidates[0][:2] if candidates else None
+
+
+SSL_CONTEXT: ssl.SSLContext | None = None
+cert_pair = _find_ssl_cert_pair()
+if cert_pair is not None:
+    CERT_FILE, KEY_FILE = cert_pair
+    try:
+        SSL_CONTEXT = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        SSL_CONTEXT.load_cert_chain(certfile=str(CERT_FILE), keyfile=str(KEY_FILE))
+        print(f"[TLS] Usando certificados: {CERT_FILE} / {KEY_FILE}")
+    except Exception as exc:
+        print(f"[TLS] No se pudo cargar el contexto TLS: {exc}")
+        SSL_CONTEXT = None
+else:
+    print("[TLS] No se encontró ningún par de certificados TLS válido; el bridge funcionará en ws://")
 
 ZONE_NAMES = ("norte", "centro", "sur")
 
 resolve_shared_token()
-SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN")
+SHARED_TOKEN = (
+    os.environ.get("AGRODRONE_SHARED_TOKEN")
+    or os.environ.get("VITE_SHARED_TOKEN")
+    or ""
+)
 
 if not SHARED_TOKEN:
-    print("[SEGURIDAD] No hay token en el keyring (ejecuta set_shared_token.py). "
-          "El bridge NO debe exponerse fuera de localhost sin esto.")
+    print("[SEGURIDAD] No hay token compartido configurado; ejecuta set_shared_token.py "
+          "para habilitar la autenticación entre bridge, sensores y controlador.")
+else:
+    print(f"[SEGURIDAD] Token compartido cargado: {SHARED_TOKEN[:4]}***")
+
+
+def token_es_valido(token_recibido: Optional[str]) -> bool:
+    """Acepta el token compartido cuando está presente y coincide con el valor cargado."""
+    if not SHARED_TOKEN:
+        return True
+
+    if isinstance(token_recibido, str):
+        token_recibido = token_recibido.strip()
+
+    if token_recibido in (None, ""):
+        return False
+
+    if token_recibido == SHARED_TOKEN:
+        return True
+
+    print(f"[TOKEN] Token recibido {token_recibido!r} no coincide con el esperado {SHARED_TOKEN!r}")
+    return False
 
 # ── Estado agregado (fusion de todas las fuentes UDP recibidas) ──────────────
 zone_readings = {
@@ -306,14 +403,8 @@ async def udp_receiver():
                 print(f"[UDP] Paquete no-JSON descartado de {addr}")
                 continue
 
-            try:
-                datos = json.loads(data.decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                print(f"[UDP] Paquete no-JSON descartado de {addr}")
-                continue
-
-            if SHARED_TOKEN and datos.get("token") != SHARED_TOKEN:
-                print(f"[UDP] Paquete sin token válido descartado de {addr}")
+            if not token_es_valido(datos.get("token")):
+                print(f"[UDP] Paquete con token inválido o ausente descartado de {addr}")
                 continue
 
             if datos.get("type") == "drone_telemetry":
@@ -347,14 +438,8 @@ async def websocket_handler(websocket):
                 print(f"[WS] Comando invalido: {message}")
                 continue
 
-            try:
-                cmd = json.loads(message)
-            except json.JSONDecodeError:
-                print(f"[WS] Comando invalido: {message}")
-                continue
-
-            if SHARED_TOKEN and cmd.get("token") != SHARED_TOKEN:
-                print(f"[WS] Comando sin token válido descartado de {client_ip}")
+            if not token_es_valido(cmd.get("token")):
+                print(f"[WS] Comando con token inválido o ausente descartado de {client_ip}")
                 continue
 
             cmd_type = cmd.get("type")
@@ -392,10 +477,16 @@ async def main():
     print("=" * 60)
     print(f"  UDP entrada:              {UDP_HOST}:{UDP_PORT}")
     print(f"  UDP salida (controlador): {CONTROLLER_HOST}:{CONTROLLER_CMD_PORT}")
-    print(f"  WebSocket:                ws://{WS_HOST}:{WS_PORT}")
+    print(f"  WebSocket:                {'wss' if SSL_CONTEXT else 'ws'}://{WS_HOST}:{WS_PORT}")
+    print(f"  Puerto WebSocket activo:  {WS_PORT}")
     print()
 
-    ws_server = await websockets.serve(websocket_handler, WS_HOST, WS_PORT)
+    ws_server = await websockets.serve(
+        websocket_handler,
+        WS_HOST,
+        WS_PORT,
+        ssl=SSL_CONTEXT,
+    )
     udp_task = asyncio.create_task(udp_receiver())
 
     await asyncio.gather(ws_server.wait_closed(), udp_task, return_exceptions=True)

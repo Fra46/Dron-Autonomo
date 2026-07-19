@@ -22,7 +22,11 @@ from datetime import datetime
 from shared_token_credentials import resolve_shared_token
 
 resolve_shared_token()
-SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN", "")
+SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN", "") or os.environ.get("VITE_SHARED_TOKEN", "")
+if SHARED_TOKEN:
+    print(f"[TOKEN] Sensor mock usando token: {SHARED_TOKEN[:4]}***")
+else:
+    print("[TOKEN] Sensor mock sin token configurado")
 
 # ── Configuración de red ──────────────────────────────────────────────────────
 DESTINO_IP     = "127.0.0.1"   # localhost: mismo equipo que Webots

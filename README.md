@@ -273,6 +273,81 @@ VITE_WS_HOST=localhost
 VITE_WS_PORT=8765
 ```
 
+## 🔐 Configuración TLS / WSS para el teléfono
+
+Para que la PWA funcione desde el móvil con `https://` y `wss://`, el bridge debe usar un certificado TLS válido para la IP local del PC, y el teléfono debe confiar en la CA mkcert.
+
+### 1. Generar el certificado mkcert
+
+Desde la raíz del proyecto:
+
+```powershell
+mkcert -install
+mkcert localhost 127.0.0.1 192.168.x.y
+```
+
+Reemplaza `192.168.x.y` con la IP local de tu PC en la red Wi-Fi.
+
+Esto genera archivos del tipo:
+
+- `127.0.0.1+2.pem`
+- `127.0.0.1+2-key.pem`
+
+Asegúrate de que el bridge use el par correcto y no el antiguo `cert.pem`/`key.pem`.
+
+### 2. Copiar el certificado correcto al repo
+
+Coloca el par generado en la raíz del proyecto:
+
+- `cert.pem` (o `127.0.0.1+2.pem`)
+- `key.pem` (o `127.0.0.1+2-key.pem`)
+
+El bridge detecta automáticamente el certificado que contiene la IP local activa.
+
+### 3. Instalar la CA mkcert en el móvil
+
+El certificado raíz de mkcert está en tu PC:
+
+- `C:\Users\andre\AppData\Local\mkcert\rootCA.pem`
+
+#### En Android
+
+1. Copia `rootCA.pem` al teléfono.
+2. Abre el archivo en el teléfono.
+3. Instálalo como certificado de usuario desde `Ajustes > Seguridad > Certificados`.
+4. Reinicia el navegador.
+
+> Si usas Chrome y sigues teniendo problemas, prueba con Firefox o Brave.
+
+#### En iOS
+
+1. Abre `rootCA.pem` en Safari.
+2. Instala el perfil que se descarga.
+3. Ve a `Ajustes > General > VPN y gestión de dispositivos`.
+4. Confía en el certificado instalado.
+
+### 4. Verificar en el teléfono
+
+Abre desde el móvil:
+
+```text
+https://192.168.1.12:3000
+```
+
+Si el sitio carga sin advertencias, la PWA podrá establecer `wss://192.168.1.12:8765` correctamente.
+
+> Si el teléfono muestra una advertencia de certificado inseguro, la causa está en la confianza TLS del certificado raíz mkcert.
+
+### 5. Solucionar problemas rápidos
+
+- Asegúrate de que el bridge está corriendo y escucha en `0.0.0.0:8765`.
+- Verifica que tu teléfono y el PC estén en la misma red Wi-Fi.
+- Si el teléfono no reconoce `192.168.1.12`, revisa la IP local con `ipconfig`.
+
+### Nota
+
+No uses certificados autofirmados no confiables en el móvil: el flujo correcto para esta demo es generar un certificado mkcert y confiar en la CA mkcert en el dispositivo.
+
 ### Puertos Utilizados
 
 | Servicio | Puerto | Protocolo | Dirección |

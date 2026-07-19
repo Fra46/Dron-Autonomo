@@ -11,6 +11,23 @@ import math
 import time                        
 import random                      # Para la dispersion horizontal de las gotas de agua
 import os
+import sys
+from pathlib import Path
+
+# Asegura que el controlador Webots pueda importar módulos del repositorio
+current_file = Path(__file__).resolve()
+script_path = None
+for ancestor in current_file.parents:
+    candidate = ancestor / "scripts" / "shared_token_credentials.py"
+    if candidate.exists():
+        script_path = ancestor / "scripts"
+        sys.path.insert(0, str(script_path))
+        break
+
+if script_path is None:
+    print(f"[WARNING] No se encontró shared_token_credentials.py en ningún ancestro de {current_file}")
+else:
+    print(f"[INFO] Añadido a sys.path: {script_path}")
 
 from shared_token_credentials import resolve_shared_token
 
