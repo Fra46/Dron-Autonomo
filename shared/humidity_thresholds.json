@@ -1,0 +1,21 @@
+{
+  "zoneStateThresholds": {
+    "humedo": 70,
+    "normal": 50,
+    "seco": 30,
+    "muy_seco": 0
+  },
+  "humidityLevelThresholds": [
+    { "level": "lv0", "max": 25 },
+    { "level": "lv1", "max": 40 },
+    { "level": "lv2", "max": 55 },
+    { "level": "lv3", "max": 70 },
+    { "level": "lv4", "max": 85 },
+    { "level": "lv5", "max": 100 }
+  ],
+  "fuzzy": {
+    "dry": { "start": 30, "end": 50 },
+    "very_dry": { "start": 20, "end": 35 },
+    "activation": 0.35
+  }
+}

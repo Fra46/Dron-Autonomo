@@ -2,7 +2,7 @@ import { useMemo, useEffect, useRef, useCallback, useState } from 'react'
 import { ButtonGroup, Button } from 'react-bootstrap'
 import { useTelemetryContext } from '@/contexts/TelemetryContext'
 import { calculateHumidityLevel } from '@/lib/telemetry'
-import { HUMIDITY_COLORS } from '@/lib/uiUtils'
+import { getHumidityColor } from '@/lib/uiUtils'
 
 interface MapContainerProps {
   missionActive: boolean
@@ -26,12 +26,8 @@ const ZONE_LAYOUT: Record<ZoneNode['id'], { x: number; y: number }> = {
 // Posición de la base (agrícola) - Al OESTE de zona centro
 const BASE_POSITION = { x: 15, y: 50 }  // x < 50 = oeste, y = 50 = mismo nivel que centro
 
-const getHumidityColor = (humidity: number, forCanvas = false) => {
-  const color = HUMIDITY_COLORS[calculateHumidityLevel(humidity)]
-  return forCanvas ? color : `var(--${getHumidityLevel(humidity)})`
-}
-
 const getHumidityLevel = calculateHumidityLevel
+const getHumidityCanvasColor = (humidity: number) => getHumidityColor(humidity)
 
 export default function MapContainer({ missionActive, onHumidityChange }: MapContainerProps) {
   const { telemetry } = useTelemetryContext()
@@ -145,7 +141,7 @@ export default function MapContainer({ missionActive, onHumidityChange }: MapCon
       const x = (zone.x / 100) * rect.width
       const y = (zone.y / 100) * rect.height
       const radius = 55
-      const color = getHumidityColor(zone.humidity, true)
+      const color = getHumidityColor(zone.humidity)
 
       const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius)
       gradient.addColorStop(0, `${color}cc`)

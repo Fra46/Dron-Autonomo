@@ -14,6 +14,7 @@ from pathlib import Path
 from datetime import datetime
 from earthdata_credentials import resolve_earthdata_credentials
 from shared_token_credentials import resolve_shared_token
+from humidity_thresholds import interpret_humedad
 
 resolve_shared_token()
 SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN", "") or os.environ.get("VITE_SHARED_TOKEN", "")
@@ -258,17 +259,6 @@ print(f"   Norte:  {len(valores_norte):>3} valores | {min(valores_norte):>5}% a 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # Interpretar el nivel de humedad para determinar el estado del suelo
-def interpretar_humedad(humedad):
-
-    if humedad >= 70:
-        return "humedo"       # tercio más alto → sin riego
-    elif humedad >= 50:
-        return "normal"       # tercio medio    → monitorear
-    elif humedad >= 30:
-        return "seco"         # parte baja      → considerar riego
-    else:
-        return "muy_seco" 
-    
 print("🚀 INICIANDO TRANSMISIÓN DE DATOS")
 print("=" * 70)
 print(f"📡 Destino: {DESTINO_IP}:{DESTINO_PUERTO}")
@@ -283,7 +273,7 @@ try:
         datos = {
             "zona"        : paquete["zona"],
             "humedad"     : paquete["humedad"],
-            "estado_suelo": interpretar_humedad(paquete["humedad"]),
+            "estado_suelo": interpret_humedad(paquete["humedad"]),
             "temperatura" : round(random.uniform(28.0, 38.0), 1), 
             "timestamp"   : datetime.now().isoformat(),  # generado en el sensor, no en el bridge
             "token"       : SHARED_TOKEN,

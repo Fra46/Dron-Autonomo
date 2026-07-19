@@ -56,7 +56,7 @@ export default function TelemetryBar() {
         <Navbar.Brand href="#" className="app-brand">
           <span className="app-brand-icon" aria-hidden="true">🚁</span>
           <span className="app-brand-text">
-            <span className="app-brand-title">AgroDron</span>
+            <span className="app-brand-title">AgroDrone</span>
             <span className="app-brand-subtitle d-none d-sm-inline">
               Riego autónomo inteligente
             </span>
@@ -104,6 +104,19 @@ export default function TelemetryBar() {
               <div className="telemetry-chip-text">
                 <span className="telemetry-chip-label">Señal UDP</span>
                 <span className="telemetry-chip-value">{signal.toFixed(0)}%</span>
+              </div>
+            </div>
+
+            <div className="telemetry-chip">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={getBatteryColor(battery)} strokeWidth="2">
+                <path d="M7 8h10v8H7z" />
+                <path d="M12 4v4" />
+              </svg>
+              <div className="telemetry-chip-text">
+                <span className="telemetry-chip-label">Tanque</span>
+                <span className="telemetry-chip-value" style={{ color: getBatteryColor(battery) }}>
+                  {telemetry.drone.waterLevel.toFixed(0)}%
+                </span>
               </div>
             </div>
 

@@ -27,12 +27,14 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
   const socketRef = useRef<ReturnType<typeof createTelemetrySocket> | null>(null)
   const commandQueueRef = useRef<TelemetrySocketCommand[]>([])
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const shouldReconnectRef = useRef(true)
 
   // Parse WebSocket message from the bridge
   const parseWSMessage = useCallback((data: string) => parseTelemetryMessage(data), [])
 
   // WebSocket connection
   const connect = useCallback(() => {
+    if (!shouldReconnectRef.current) return
     if (socketRef.current) return
     if (typeof window === 'undefined') return
 
@@ -153,6 +155,10 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
         setIsConnected(false)
         socketRef.current = null
 
+        if (!shouldReconnectRef.current) {
+          return
+        }
+
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current)
         }
@@ -241,6 +247,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
 
   // Initialize
   useEffect(() => {
+    shouldReconnectRef.current = true
     console.log('[Telemetry] useEffect ejecutado')
     console.log('[Telemetry] Hook inicializado con opciones:', { wsUrl })
 
@@ -250,6 +257,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
     }, 500)
 
     return () => {
+      shouldReconnectRef.current = false
       clearTimeout(connectionDelay)
       if (socketRef.current) {
         socketRef.current.close()

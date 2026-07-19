@@ -1,11 +1,11 @@
 """
 shared_token_credentials.py — Resuelve el token compartido de AgroDrone
-desde el keyring seguro del sistema operativo.
+desde el entorno, un archivo .env.local de desarrollo o el keyring seguro
+del sistema operativo.
 
-Mismo patrón que earthdata_credentials.py: nunca lee el token de un
-archivo de texto plano ni de un argumento de línea de comandos en claro,
-solo del almacén de credenciales del OS (Windows Credential Manager,
-macOS Keychain, o el backend disponible en Linux).
+Mismo patrón que earthdata_credentials.py: el primer intento es leerlo del
+entorno, luego se comprueba `.env.local` para facilitar el desarrollo del
+frontend, y finalmente se consulta el keyring del OS.
 """
 
 import os

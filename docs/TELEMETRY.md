@@ -11,7 +11,7 @@
 ```
 ┌─────────────────┐                                   ┌──────────────────┐    WebSocket (8765)      ┌──────────────┐
 │  sensor_nasa.py │ ── UDP 5005 (lectura de suelo) ─► │  udp_websocket   │ ◄──────────────────────► │     PWA      │
-│  sensor_mock.py │                                   │    _bridge.py    │   (snapshot agregado     │  (Frontend)  │
+│                │                                   │    _bridge.py    │   (snapshot agregado     │  (Frontend)  │
 └─────────────────┘                                   │  (agregador con  │   + comandos de misión)  └──────────────┘
                                                       │     estado)      │
 ┌─────────────────┐                                   │                  │
@@ -51,13 +51,6 @@ Requiere un token de Earthdata guardado en el keyring del sistema (ver README
 principal). Si no hay token o falla la conexión remota, cae automáticamente a
 un fallback simulado compatible, sin detener el flujo de telemetría.
 
-### Opción B: Datos Simulados (sensor_mock.py)
-```bash
-python sensor_mock.py
-```
-Simula 3 zonas (norte, centro, sur) con rangos de humedad distintos. Útil
-solo para desarrollo rápido sin red/credenciales.
-
 ## Paso 3: Ejecutar la PWA
 
 ```bash
@@ -77,7 +70,7 @@ La PWA se conecta automáticamente al WebSocket en `ws://localhost:8765`.
 
 ## Formato de Datos
 
-### Entrada UDP al bridge — lectura de suelo (sensor_nasa.py / sensor_mock.py → bridge, puerto 5005)
+### Entrada UDP al bridge — lectura de suelo (sensor_nasa.py → bridge, puerto 5005)
 
 ```json
 {
@@ -318,8 +311,8 @@ para que se vea en vivo durante la demo, incluso desde un teléfono.
   (`parseTelemetryMessage`) documenta el contrato exacto esperado.
 
 ### No llegan datos del sensor
-- Verifica que `sensor_mock.py` o `sensor_nasa.py` esté corriendo
-- Ambos deben enviar al puerto 5005 en localhost
+- Verifica que `sensor_nasa.py` esté corriendo
+- Debe enviar datos al puerto 5005 en localhost
 - El puente debe mostrar "UDP recibido" o el log de `procesar_lectura_suelo` en la consola
 
 ### El dron no responde en Webots / no llega telemetría del dron

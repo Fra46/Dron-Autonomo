@@ -26,7 +26,7 @@ Sistema completo de riego agrícola autónomo que combina un dron Mavic 2 Pro co
 ```
 ┌─────────────────┐                                   ┌──────────────────┐    WebSocket (8765)      ┌──────────────┐
 │  sensor_nasa.py │ ── UDP 5005 (lectura de suelo) ─► │  udp_websocket   │ ◄──────────────────────► │     PWA      │
-│  sensor_mock.py │                                   │    _bridge.py    │   (snapshot agregado     │  (Frontend)  │
+│                 │                                   │    _bridge.py    │   (snapshot agregado     │  (Frontend)  │
 └─────────────────┘                                   │  (agregador con  │   + comandos de mision)  └──────────────┘
                                                       │     estado)      │
 ┌─────────────────┐                                   │                  │
@@ -101,6 +101,9 @@ npm install
 # Instalar dependencias de Python
 pip install websockets
 
+# Opcional: para validar certificados TLS mkcert en el bridge
+pip install cryptography
+
 # Para datos satelitales de NASA
 pip install earthaccess h5py numpy
 ```
@@ -133,6 +136,15 @@ Si no configuras el token en el keyring o si la conexión remota a NASA falla,
 el sistema cae automáticamente a un fallback simulado sin interrumpir el flujo
 de telemetría.
 
+> ⚠️ Si `AGRODRONE_SHARED_TOKEN` / `VITE_SHARED_TOKEN` queda vacío, el bridge
+> aceptará conexiones sin autenticación. En ese caso el sistema queda abierto
+> a cualquier cliente que pueda conectarse al WebSocket o enviar paquetes UDP.
+>
+> ⚠️ `VITE_SHARED_TOKEN` se inyecta en el bundle de Vite en build-time. Esto
+> significa que el valor es visible desde el navegador y no es un secreto seguro.
+> Para un despliegue real deberías usar autenticación en servidor/backend en vez
+> de confiar en un secreto del frontend.
+
 ### 4. Configurar Webots
 
 1. Instalar [Webots R2023b+](https://cyberbotics.com/)
@@ -155,14 +167,9 @@ python udp_websocket_bridge.py
 
 **Terminal 2 — Sensor de datos (fuente principal: NASA SMAP):**
 ```bash
-# Opción A (recomendada): datos reales del satélite NASA SMAP
+# Opción recomendada: datos reales del satélite NASA SMAP
 # Requiere token de Earthdata guardado en keyring — ver "Configuración de Credenciales NASA" arriba.
 python sensor_nasa.py
-# → Si no hay token en keyring o falla la conexión remota, cae automáticamente
-#   a un fallback simulado compatible, sin detener el flujo de telemetría.
-
-# Opción B: simulador puro, útil solo para desarrollo rápido sin red/credenciales
-python sensor_mock.py
 ```
 
 **Terminal 3 — Simulación del dron (Webots):**
@@ -186,7 +193,6 @@ npm run dev -- --host
 | Modo | Comando | Datos | Velocidad | Requisitos |
 |------|---------|-------|-----------|-----------|
 | **NASA SMAP Real** (recomendado) | `sensor_nasa.py` | Satélite real, con fallback simulado integrado | 🐢 Lento (1a) | Token Earthdata en keyring |
-| **Simulación** | `sensor_mock.py` | Aleatorios realistas | ⚡ Rápido | Ninguno |
 | **Simulación Completa** | Webots + `mavic_controller.py` | Física realista + telemetría real del dron | 🐢 Muy lento | Webots instalado |
 
 ✅ **Nota:** Si `sensor_nasa.py` no tiene credenciales o falla la conexión remota, **automáticamente cambia a datos simulados** sin interrumpir el flujo de telemetría hacia la PWA.
@@ -234,7 +240,6 @@ Dron-autonomo/
 
 | Script | Comando | Descripción |
 |--------|---------|-------------|
-| `sensor_mock.py` | `python sensor_mock.py` | Simula sensores de humedad |
 | `sensor_nasa.py` | `python sensor_nasa.py` | Descarga datos reales NASA SMAP |
 | `udp_websocket_bridge.py` | `python udp_websocket_bridge.py` | Puente UDP ↔ WebSocket |
 | `mavic_controller.py` | `python mavic_controller.py` | Controlador del dron Webots |
@@ -308,7 +313,7 @@ El bridge detecta automáticamente el certificado que contiene la IP local activ
 
 El certificado raíz de mkcert está en tu PC:
 
-- `C:\Users\andre\AppData\Local\mkcert\rootCA.pem`
+- `rootCA.pem`
 
 #### En Android
 

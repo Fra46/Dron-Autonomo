@@ -5,7 +5,7 @@ Universidad Popular del Cesar
 
 Implementa el bloque "Communication Middleware" descrito en el paper del 20CCC
 (Fig. 1 y Fig. 2): recibe telemetria real por UDP desde dos tipos de fuentes
-- lecturas de humedad de suelo (sensor_nasa.py / sensor_mock.py)
+- lecturas de humedad de suelo (sensor_nasa.py)
  - telemetria del dron (mavic_controller.py corriendo en Webots)
 las fusiona en un unico snapshot ("Process telemetry" en la Fig. 2) y lo
 retransmite por WebSocket a la PWA. Tambien reenvia los comandos de mision
@@ -27,13 +27,16 @@ Esquema de puertos (evita colisiones con mavic_controller.py):
 """
 
 import asyncio
+import hmac
 import json
 import socket
 import time
 import os
 import ssl
 from pathlib import Path
+from urllib.parse import urlparse
 from shared_token_credentials import resolve_shared_token
+from humidity_thresholds import calculate_humidity_level, interpret_humedad
 
 
 def encontrar_puerto_libre(inicio: int = 8765, max_intentos: int = 20) -> int:
@@ -72,10 +75,30 @@ def _local_address_candidates() -> set[str]:
     return candidates
 
 
+def _origin_is_allowed(origin: Optional[str]) -> bool:
+    if not origin:
+        return False
+    try:
+        parsed = urlparse(origin)
+        host = parsed.hostname
+        return host in _local_address_candidates()
+    except Exception:
+        return False
+
+
+
 def _cert_sans(cert_path: Path) -> set[str]:
     try:
-        cert_info = ssl._ssl._test_decode_cert(str(cert_path))
-        return {value for key, value in cert_info.get('subjectAltName', ())}
+        from cryptography import x509
+        from cryptography.hazmat.backends import default_backend
+
+        cert_bytes = cert_path.read_bytes()
+        cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
+        san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+        return {str(entry.value) for entry in san}
+    except ImportError:
+        print("[TLS] cryptography no instalado; no se puede leer SAN desde el certificado PEM.")
+        return set()
     except Exception:
         return set()
 
@@ -101,7 +124,9 @@ def _find_ssl_cert_pair() -> tuple[Path, Path] | None:
         if matches:
             return cert_path, key_path
 
-    return candidates[0][:2] if candidates else None
+    if candidates:
+        print("[TLS] Ningún certificado PEM coincide con las direcciones locales; no se seleccionará ningún certificado TLS.")
+    return None
 
 
 SSL_CONTEXT: ssl.SSLContext | None = None
@@ -139,16 +164,17 @@ def token_es_valido(token_recibido: Optional[str]) -> bool:
     if not SHARED_TOKEN:
         return True
 
-    if isinstance(token_recibido, str):
-        token_recibido = token_recibido.strip()
-
-    if token_recibido in (None, ""):
+    if not isinstance(token_recibido, str):
         return False
 
-    if token_recibido == SHARED_TOKEN:
+    token_recibido = token_recibido.strip()
+    if token_recibido == "":
+        return False
+
+    if hmac.compare_digest(token_recibido, SHARED_TOKEN):
         return True
 
-    print(f"[TOKEN] Token recibido {token_recibido!r} no coincide con el esperado {SHARED_TOKEN!r}")
+    print("[TOKEN] Token recibido no coincide con el valor esperado")
     return False
 
 # ── Estado agregado (fusion de todas las fuentes UDP recibidas) ──────────────
@@ -191,38 +217,12 @@ connected_clients: Set = set()
 controller_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 controller_sock.setblocking(False)
 
-def calcular_nivel_humedad(humedad: float) -> str:
-    if humedad < 25:
-        return "lv0"
-    if humedad < 40:
-        return "lv1"
-    if humedad < 55:
-        return "lv2"
-    if humedad < 70:
-        return "lv3"
-    if humedad < 85:
-        return "lv4"
-    return "lv5"
-
-
-def estado_desde_humedad(humedad: float) -> str:
-    """Misma clasificacion de 4 categorias que interpretar_humedad() en
-    sensor_mock.py / sensor_nasa.py, recalculada aqui porque la etiqueta que
-    trae el paquete crudo del sensor puede quedar desactualizada despues de
-    aplicar el boost de riego."""
-    if humedad >= 70:
-        return "humedo"
-    if humedad >= 50:
-        return "normal"
-    if humedad >= 30:
-        return "seco"
-    return "muy_seco"
 
 
 def calcular_zonas_humedad() -> dict:
     zones = {"lv0": 0, "lv1": 0, "lv2": 0, "lv3": 0, "lv4": 0, "lv5": 0}
     for data in zone_readings.values():
-        zones[calcular_nivel_humedad(data["humedad"])] += 1
+        zones[calculate_humidity_level(data["humedad"])] += 1
     return zones
 
 
@@ -251,7 +251,7 @@ def build_snapshot() -> dict:
                 "humedad": data["humedad"],
                 "estado": data["estado"],
                 "temperatura": data["temperatura"],
-                "nivel": calcular_nivel_humedad(data["humedad"]),
+                "nivel": calculate_humidity_level(data["humedad"]),
             }
             for name, data in zone_readings.items()
         },
@@ -299,7 +299,7 @@ def procesar_lectura_suelo(datos: dict):
     humedad = min(100.0, humedad_cruda + boost)
     # La etiqueta la recalculamos aqui (no la que trae el paquete) porque
     # puede quedar desactualizada despues de sumar el boost de riego.
-    estado = estado_desde_humedad(humedad)
+    estado = interpret_humedad(humedad)
     temperatura = float(datos.get("temperatura", zone_readings[zona]["temperatura"]))
 
     zone_readings[zona] = {"humedad": humedad, "estado": estado, "temperatura": temperatura}
@@ -424,6 +424,13 @@ async def udp_receiver():
             await asyncio.sleep(0.1)
 
 async def websocket_handler(websocket):
+    origin = websocket.request_headers.get('Origin') or websocket.request_headers.get('origin')
+    if not _origin_is_allowed(origin):
+        client_ip = websocket.remote_address[0] if websocket.remote_address else "unknown"
+        print(f"[WS] Origen no permitido {origin!r} desde {client_ip}; cerrando conexion")
+        await websocket.close(code=1008, reason="Origin not allowed")
+        return
+
     connected_clients.add(websocket)
     client_ip = websocket.remote_address[0] if websocket.remote_address else "unknown"
     print(f"[WS] Nueva conexion desde {client_ip}")

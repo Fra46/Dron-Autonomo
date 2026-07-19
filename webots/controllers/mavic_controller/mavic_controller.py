@@ -297,6 +297,10 @@ distancia_inicial_navegando = None
 distancia_inicial_retorno = None
 
 nivel_agua_estimado = 100.0
+bateria_reportada = 100.0
+
+def _at_base_and_landed(x_global: float, y_global: float, actual_altitude: float) -> bool:
+    return math.hypot(x_global - BASE_XY[0], y_global - BASE_XY[1]) < 0.25 and actual_altitude <= ALTURA_SUELO + 0.02
 
 ESTADO_A_FRONTEND = {
     IDLE: "idle",
@@ -334,10 +338,19 @@ def proyectar_a_porcentaje(x_m: float, y_m: float):
     return {"x": 50.0, "y": y_pct, "z": 0.0}
 
 def enviar_telemetria(x_global, y_global, actual_altitude, speed_mps):
-    global nivel_agua_estimado
-    bateria_reportada = 100.0
+    global nivel_agua_estimado, bateria_reportada
+
     if estado == REGANDO:
         nivel_agua_estimado = max(0.0, nivel_agua_estimado - 0.5)
+    elif _at_base_and_landed(x_global, y_global, actual_altitude):
+        nivel_agua_estimado = min(100.0, nivel_agua_estimado + 1.0)
+
+    if estado in (ASCENSO, NAVEGANDO, REGANDO, RETORNO, DESCENSO):
+        bateria_reportada = max(0.0, bateria_reportada - 0.25)
+    elif _at_base_and_landed(x_global, y_global, actual_altitude):
+        bateria_reportada = min(100.0, bateria_reportada + 0.5)
+    else:
+        bateria_reportada = max(0.0, bateria_reportada - 0.02)
 
     target_pct = proyectar_a_porcentaje(*objetivo_xy) if objetivo_zona else None
 
@@ -411,43 +424,48 @@ def calcular_progreso_mision(x_actual: float, y_actual: float, altura_actual: fl
 
 def avanzar_a_siguiente_zona_o_retorno(motivo: str, x_actual: float, y_actual: float):
     global objetivo_zona, objetivo_xy, estado, timer_riego, cola_zonas
-    global distancia_inicial_navegando, distancia_inicial_retorno
+    global distancia_inicial_navegando, distancia_inicial_retorno, integral_x, integral_y
 
     if cola_zonas:
         objetivo_zona = cola_zonas.pop(0)
         objetivo_xy = COORDENADAS_ZONAS.get(objetivo_zona, [0.0, 0.0])
+        integral_x = 0.0
+        integral_y = 0.0
         timer_riego = 0.0
         estado = NAVEGANDO
         error_x0 = objetivo_xy[0] - x_actual
         error_y0 = objetivo_xy[1] - y_actual
         distancia_inicial_navegando = math.sqrt(error_x0**2 + error_y0**2) or 0.001
         print(f"  {motivo} Zonas pendientes en cola: siguiente → {objetivo_zona.upper()} (quedan {len(cola_zonas)}).")
-    else:
-        if modo == MODO_AUTO:
-            zonas_secas_nuevas = [
-                z for z, h in ultima_humedad.items()
-                if h is not None and requiere_riego(h)
-            ]
-            
-            if zonas_secas_nuevas:
-                objetivo_zona = zonas_secas_nuevas[0]
-                objetivo_xy = COORDENADAS_ZONAS.get(objetivo_zona, [0.0, 0.0])
-                cola_zonas = zonas_secas_nuevas[1:]  
-                timer_riego = 0.0
-                estado = NAVEGANDO
-                error_x0 = objetivo_xy[0] - x_actual
-                error_y0 = objetivo_xy[1] - y_actual
-                distancia_inicial_navegando = math.sqrt(error_x0**2 + error_y0**2) or 0.001
-                print(f"  {motivo} Nuevas zonas secas detectadas: {objetivo_zona.upper()}")
-                return
-        
-        objetivo_xy = BASE_XY.copy()
-        objetivo_zona = None
-        estado = RETORNO
-        error_x0 = objetivo_xy[0] - x_actual
-        error_y0 = objetivo_xy[1] - y_actual
-        distancia_inicial_retorno = math.sqrt(error_x0**2 + error_y0**2) or 0.001
-        print(f"  {motivo} No quedan zonas pendientes. Iniciando RETORNO.")
+        return
+
+    if modo == MODO_AUTO:
+        zonas_secas_nuevas = [
+            z for z, h in ultima_humedad.items()
+            if h is not None and requiere_riego(h)
+        ]
+
+        if zonas_secas_nuevas:
+            objetivo_zona = zonas_secas_nuevas[0]
+            objetivo_xy = COORDENADAS_ZONAS.get(objetivo_zona, [0.0, 0.0])
+            integral_x = 0.0
+            integral_y = 0.0
+            cola_zonas = zonas_secas_nuevas[1:]
+            timer_riego = 0.0
+            estado = NAVEGANDO
+            error_x0 = objetivo_xy[0] - x_actual
+            error_y0 = objetivo_xy[1] - y_actual
+            distancia_inicial_navegando = math.sqrt(error_x0**2 + error_y0**2) or 0.001
+            print(f"  {motivo} Nuevas zonas secas detectadas: {objetivo_zona.upper()}")
+            return
+
+    objetivo_xy = BASE_XY.copy()
+    objetivo_zona = None
+    estado = RETORNO
+    error_x0 = objetivo_xy[0] - x_actual
+    error_y0 = objetivo_xy[1] - y_actual
+    distancia_inicial_retorno = math.sqrt(error_x0**2 + error_y0**2) or 0.001
+    print(f"  {motivo} No quedan zonas pendientes. Iniciando RETORNO.")
 
 # Configurar valores para cálculo inicial de velocidad
 past_x_global = gps.getValues()[0]
@@ -537,7 +555,7 @@ while robot.step(timestep) != -1:
                     print(f"  [AUTO] Riego requerido en {zona.upper()}. Iniciando ASCENSO.")
 
             elif estado == REGANDO:
-                if zona == objetivo_zona and not requiere_riego(humedad):
+                if zona == objetivo_zona and timer_riego >= TIEMPO_RIEGO_S and not requiere_riego(humedad):
                     avanzar_a_siguiente_zona_o_retorno(
                         f"Zona {zona.upper()} ya no requiere riego.", past_x_global, past_y_global
                     )
@@ -653,6 +671,8 @@ while robot.step(timestep) != -1:
 
             if distancia_xy < TOLERANCIA_XY:
                 print(f"  Zona alcanzada en ({x_global:.2f}, {y_global:.2f}). Iniciando RIEGO...")
+                integral_x = 0.0
+                integral_y = 0.0
                 timer_riego = 0.0
                 estado      = REGANDO   
 

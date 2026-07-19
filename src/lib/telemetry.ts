@@ -140,13 +140,10 @@ export const DEFAULT_TELEMETRY: TelemetryData = {
   pwaLatencyMs: null,
 }
 
+import { calculateHumidityLevel as calculateHumidityLevelFromThresholds } from './humidityThresholds'
+
 export const calculateHumidityLevel = (humedad: number): HumidityLevel => {
-  if (humedad < 25) return 'lv0'
-  if (humedad < 40) return 'lv1'
-  if (humedad < 55) return 'lv2'
-  if (humedad < 70) return 'lv3'
-  if (humedad < 85) return 'lv4'
-  return 'lv5'
+  return calculateHumidityLevelFromThresholds(humedad)
 }
 
 export const calculateHumidityZones = (zones: TelemetryZones): Record<HumidityLevel, number> => {

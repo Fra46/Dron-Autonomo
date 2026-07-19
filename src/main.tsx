@@ -9,7 +9,7 @@ const updateSW = registerSW({
   onOfflineReady() {
     // El service worker ya está listo para funcionar offline.
   },
-  onRegistered(registration) {
+  onRegistered(registration: ServiceWorkerRegistration | undefined) {
     // Se puede usar la registración para control adicional si es necesario.
   }
 })
