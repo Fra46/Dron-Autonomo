@@ -17,7 +17,12 @@ import json
 import random
 import time
 import itertools
+import os
 from datetime import datetime
+from shared_token_credentials import resolve_shared_token
+
+resolve_shared_token()
+SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN", "")
 
 # ── Configuración de red ──────────────────────────────────────────────────────
 DESTINO_IP     = "127.0.0.1"   # localhost: mismo equipo que Webots
@@ -67,6 +72,7 @@ def generar_datos(zona: dict) -> dict:
         "bateria"     : random.randint(60, 100),                    # % batería del nodo
         "estado_suelo": interpretar_humedad(humedad),
         "timestamp"   : datetime.now().isoformat(),                 # generado en el sensor, no en el bridge
+        "token"       : SHARED_TOKEN,
     }
 
 

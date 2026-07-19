@@ -1,5 +1,7 @@
 import { TelemetryCommand } from './commands'
 
+const SHARED_TOKEN = import.meta.env.VITE_SHARED_TOKEN as string | undefined
+
 export type TelemetrySocketCommand = TelemetryCommand
 
 export interface TelemetrySocket {
@@ -44,7 +46,8 @@ export function createTelemetrySocket(
   return {
     sendCommand: command => {
       if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify(command))
+        const withToken = { ...command, token: command.token ?? SHARED_TOKEN }
+        socket.send(JSON.stringify(withToken))
         return true
       }
       return false

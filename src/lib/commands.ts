@@ -3,6 +3,7 @@ export interface DroneCommand {
   target_zone?: string
   mode?: 'auto' | 'manual'
   [key: string]: unknown
+  token?: string
 }
 
 export interface TelemetryCommand extends DroneCommand {

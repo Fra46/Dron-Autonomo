@@ -30,6 +30,8 @@ import asyncio
 import json
 import socket
 import time
+import os
+from shared_token_credentials import resolve_shared_token
 from datetime import datetime
 from typing import Set, Optional
 
@@ -44,6 +46,13 @@ CONTROLLER_HOST = "127.0.0.1"
 CONTROLLER_CMD_PORT = 5006   # Salida: reenvio de lecturas de suelo + comandos de mision
 
 ZONE_NAMES = ("norte", "centro", "sur")
+
+resolve_shared_token()
+SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN")
+
+if not SHARED_TOKEN:
+    print("[SEGURIDAD] No hay token en el keyring (ejecuta set_shared_token.py). "
+          "El bridge NO debe exponerse fuera de localhost sin esto.")
 
 # ── Estado agregado (fusion de todas las fuentes UDP recibidas) ──────────────
 zone_readings = {
@@ -84,7 +93,6 @@ connected_clients: Set = set()
 # Socket UDP de salida hacia el controlador (comandos + reenvio de suelo)
 controller_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 controller_sock.setblocking(False)
-
 
 def calcular_nivel_humedad(humedad: float) -> str:
     if humedad < 25:
@@ -298,6 +306,16 @@ async def udp_receiver():
                 print(f"[UDP] Paquete no-JSON descartado de {addr}")
                 continue
 
+            try:
+                datos = json.loads(data.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                print(f"[UDP] Paquete no-JSON descartado de {addr}")
+                continue
+
+            if SHARED_TOKEN and datos.get("token") != SHARED_TOKEN:
+                print(f"[UDP] Paquete sin token válido descartado de {addr}")
+                continue
+
             if datos.get("type") == "drone_telemetry":
                 procesar_telemetria_dron(datos)
             elif "zona" in datos and "humedad" in datos:
@@ -329,6 +347,16 @@ async def websocket_handler(websocket):
                 print(f"[WS] Comando invalido: {message}")
                 continue
 
+            try:
+                cmd = json.loads(message)
+            except json.JSONDecodeError:
+                print(f"[WS] Comando invalido: {message}")
+                continue
+
+            if SHARED_TOKEN and cmd.get("token") != SHARED_TOKEN:
+                print(f"[WS] Comando sin token válido descartado de {client_ip}")
+                continue
+
             cmd_type = cmd.get("type")
 
             if cmd_type == "request_status":
@@ -343,7 +371,8 @@ async def websocket_handler(websocket):
 
             if cmd_type in ("start_mission", "stop_mission", "emergency_stop", "set_mode"):
                 try:
-                    controller_sock.sendto(json.dumps(cmd).encode("utf-8"), (CONTROLLER_HOST, CONTROLLER_CMD_PORT))
+                    forward = {**cmd, "token": SHARED_TOKEN}
+                    controller_sock.sendto(json.dumps(forward).encode("utf-8"), (CONTROLLER_HOST, CONTROLLER_CMD_PORT))
                     print(f"[CMD] Reenviado a controlador: {cmd}")
                 except Exception as e:
                     print(f"[CMD] Error reenviando comando: {e}")

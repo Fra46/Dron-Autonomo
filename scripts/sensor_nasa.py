@@ -12,8 +12,11 @@ import sys
 import concurrent.futures
 from pathlib import Path
 from datetime import datetime
-
 from earthdata_credentials import resolve_earthdata_credentials
+from shared_token_credentials import resolve_shared_token
+
+resolve_shared_token()
+SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN", "")
 
 DESTINO_IP     = "127.0.0.1"
 DESTINO_PUERTO = 5005
@@ -279,6 +282,7 @@ try:
             "estado_suelo": interpretar_humedad(paquete["humedad"]),
             "temperatura" : round(random.uniform(28.0, 38.0), 1), 
             "timestamp"   : datetime.now().isoformat(),  # generado en el sensor, no en el bridge
+            "token"       : SHARED_TOKEN,
         }
 
         mensaje = json.dumps(datos).encode()

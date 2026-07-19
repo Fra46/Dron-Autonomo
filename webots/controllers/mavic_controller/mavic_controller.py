@@ -10,6 +10,12 @@ import json
 import math                        
 import time                        
 import random                      # Para la dispersion horizontal de las gotas de agua
+import os
+
+from shared_token_credentials import resolve_shared_token
+
+resolve_shared_token()
+SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN", "")
 
 # ── 1. CONFIGURACIÓN DE RED ──────────────────────────────────────────────────
 UDP_IP   = "0.0.0.0"
@@ -329,6 +335,7 @@ def enviar_telemetria(x_global, y_global, actual_altitude, speed_mps):
         "altitude": round(actual_altitude, 2),
         "modo": modo,
         "missionProgress": round(calcular_progreso_mision(x_global, y_global, actual_altitude), 3),
+        "token": SHARED_TOKEN,
     }
     if target_pct is not None:
         paquete["targetPosition"] = target_pct
