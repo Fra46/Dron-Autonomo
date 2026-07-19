@@ -81,7 +81,14 @@ def _origin_is_allowed(origin: Optional[str]) -> bool:
     try:
         parsed = urlparse(origin)
         host = parsed.hostname
-        return host in _local_address_candidates()
+        if not host:
+            return False
+        candidates = _local_address_candidates()
+        if host in candidates:
+            return True
+        if host.startswith("192.168.") or host.startswith("10.") or host.startswith("172."):
+            return True
+        return False
     except Exception:
         return False
 

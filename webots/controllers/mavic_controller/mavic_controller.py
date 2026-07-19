@@ -39,6 +39,13 @@ try:
     zone_layout_path = repo_root / 'shared' / 'zone_layout.json'
     if zone_layout_path.exists():
         ZONE_LAYOUT = _json.loads(zone_layout_path.read_text(encoding='utf-8'))
+        if ZONE_LAYOUT:
+            COORDENADAS_ZONAS = {
+                "norte": [ZONE_LAYOUT['zones']['norte']['world']['x'], ZONE_LAYOUT['zones']['norte']['world']['y']],
+                "centro": [ZONE_LAYOUT['zones']['centro']['world']['x'], ZONE_LAYOUT['zones']['centro']['world']['y']],
+                "sur": [ZONE_LAYOUT['zones']['sur']['world']['x'], ZONE_LAYOUT['zones']['sur']['world']['y']],
+            }
+            BASE_XY = [ZONE_LAYOUT['base']['world']['x'], ZONE_LAYOUT['base']['world']['y']]
     else:
         ZONE_LAYOUT = None
 except Exception:

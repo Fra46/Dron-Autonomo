@@ -3,15 +3,28 @@ import socket
 import json
 import time
 import itertools
-import earthaccess
-import h5py
-import numpy as np
 import os
 import glob
 import sys
 import concurrent.futures
 from pathlib import Path
 from datetime import datetime
+
+try:
+    import earthaccess
+except ImportError:
+    earthaccess = None
+
+try:
+    import h5py
+except ImportError:
+    h5py = None
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
 from earthdata_credentials import resolve_earthdata_credentials
 from shared_token_credentials import resolve_shared_token
 from humidity_thresholds import interpret_humedad
@@ -31,6 +44,18 @@ DESTINO_PUERTO = 5005
 # ────────────────────────────────────────────────────────────────────────────
 
 USE_MOCK_MODE = False  # Se activará si falla conexión a NASA
+MISSING_DEPENDENCIES = []
+if earthaccess is None:
+    MISSING_DEPENDENCIES.append("earthaccess")
+if h5py is None:
+    MISSING_DEPENDENCIES.append("h5py")
+if np is None:
+    MISSING_DEPENDENCIES.append("numpy")
+
+if MISSING_DEPENDENCIES:
+    print(f"⚠️ Dependencias faltantes para NASA SMAP: {', '.join(MISSING_DEPENDENCIES)}")
+    print("📊 Cambiando a modo simulación...")
+    USE_MOCK_MODE = True
 
 print("🌍 Conectando con NASA SMAP...")
 print()
@@ -56,6 +81,9 @@ else:
 try:
     auth = None
     strategies = []
+
+    if earthaccess is None:
+        raise RuntimeError("earthaccess no está instalado")
 
     if has_nasa_credentials():
         strategies.append("environment")
@@ -144,39 +172,32 @@ if len(archivos) > 0 and not USE_MOCK_MODE:
     print("🔍 Extrayendo datos reales del satélite NASA SMAP...\n")
     
     try:
-        # Recorrer cada archivo descargado, para extraer los datos de humedad y sus coordenadas, y filtrar solo los que estén dentro del Cesar.
+        if h5py is None or np is None:
+            raise RuntimeError("numpy o h5py no están disponibles")
+
         for archivo in archivos:
             with h5py.File(archivo, "r") as f:
-
-                # Extraemos humedad y coordenadas
                 humedad_raw = f["Soil_Moisture_Retrieval_Data_AM"]["soil_moisture"][:]
                 latitudes   = f["Soil_Moisture_Retrieval_Data_AM"]["latitude"][:]
                 longitudes  = f["Soil_Moisture_Retrieval_Data_AM"]["longitude"][:]
 
-                # Recorrer cada píxel del satélite
-                filas, columnas = humedad_raw.shape
-                for i in range(filas):
-                    for j in range(columnas):
-                        lat = latitudes[i, j]
-                        lon = longitudes[i, j]
-                        hum = humedad_raw[i, j]
+                mask = (
+                    (latitudes >= LAT_MIN) & (latitudes <= LAT_MAX) &
+                    (longitudes >= LON_MIN) & (longitudes <= LON_MAX) &
+                    (humedad_raw > 0)
+                )
+                values = np.asarray(humedad_raw[mask], dtype=float) * 100.0
+                lat_values = np.asarray(latitudes[mask], dtype=float)
+                valid_values = np.round(values, 1)
+                valores_reales.extend(valid_values.tolist())
 
-                        # Filtramos solo los píxeles dentro del Cesar
-                        if (LAT_MIN <= lat <= LAT_MAX and
-                            LON_MIN <= lon <= LON_MAX and
-                            hum > 0):
-
-                            # Convertimos a porcentaje y redondeamos a 1 decimal
-                            valor = round(float(hum) * 100, 1)
-                            valores_reales.append(valor)
-
-                            # Asignar zona geográfica real según latitud
-                            if lat < 9.66:
-                                valores_sur.append(valor)
-                            elif lat < 10.33:
-                                valores_centro.append(valor)
-                            else:
-                                valores_norte.append(valor)
+                for valor, lat in zip(valid_values, lat_values):
+                    if lat < 9.66:
+                        valores_sur.append(float(valor))
+                    elif lat < 10.33:
+                        valores_centro.append(float(valor))
+                    else:
+                        valores_norte.append(float(valor))
 
     except Exception as e:
         print(f"❌ Error extrayendo datos: {e}")
@@ -193,8 +214,11 @@ if USE_MOCK_MODE or len(valores_reales) == 0:
     
     # Generar datos simulados realistas para Cesar
     # Humedad típica en región tropical: 30-80%
-    np.random.seed(42)  # Para reproducibilidad
-    valores_reales = list(np.random.uniform(30, 80, 50).round(1))
+    if np is None:
+        valores_reales = [round(random.uniform(30, 80), 1) for _ in range(50)]
+    else:
+        np.random.seed(42)  # Para reproducibilidad
+        valores_reales = list(np.random.uniform(30, 80, 50).round(1))
     valores_sur = valores_reales[:17]
     valores_centro = valores_reales[17:34]
     valores_norte = valores_reales[34:]
