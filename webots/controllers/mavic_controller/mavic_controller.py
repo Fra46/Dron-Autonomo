@@ -53,6 +53,7 @@ except Exception:
 
 resolve_shared_token()
 SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN", "")
+ALLOW_INSECURE = str(os.environ.get("AGRODRONE_ALLOW_INSECURE", "")).lower() in ("1", "true", "yes")
 
 # ── 1. CONFIGURACIÓN DE RED ──────────────────────────────────────────────────
 UDP_IP   = "0.0.0.0"
@@ -330,7 +331,7 @@ _ANCLAS_X_PCT = sorted(
 
 def token_valido(token_recibido: object) -> bool:
     if not SHARED_TOKEN:
-        return True
+        return ALLOW_INSECURE
     if not isinstance(token_recibido, str):
         return False
     return hmac.compare_digest(token_recibido.strip(), SHARED_TOKEN)

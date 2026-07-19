@@ -22,8 +22,11 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       ? (() => {
           const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
           const host = import.meta.env.VITE_WS_HOST || window.location.hostname
-          const preferredPort = import.meta.env.VITE_WS_PORT || '8765'
-          const ports = Array.from(new Set([preferredPort, '8765', '8766', '8767', '8768', '8769', '8770']))
+          const preferred = parseInt(import.meta.env.VITE_WS_PORT || '8765', 10) || 8765
+          // Match the bridge's default max attempts (20) so the PWA will try the
+          // same port range the bridge may have selected from.
+          const RANGE = 20
+          const ports = Array.from(new Set(Array.from({ length: RANGE }, (_, i) => String(preferred + i))))
           return ports.map(port => `${protocol}://${host}:${port}`)
         })()
       : '',

@@ -181,16 +181,23 @@ SHARED_TOKEN = (
     or ""
 )
 
+ALLOW_INSECURE = str(os.environ.get("AGRODRONE_ALLOW_INSECURE", "")).lower() in ("1", "true", "yes")
+
 if not SHARED_TOKEN:
-    print("[SEGURIDAD] No hay token compartido configurado; el sistema queda en modo inseguro por defecto hasta que ejecutes set_shared_token.py.")
+    if ALLOW_INSECURE:
+        print("[SEGURIDAD] ADVERTENCIA: No hay token compartido, pero AGRODRONE_ALLOW_INSECURE=true permite funcionamiento inseguro.")
+    else:
+        print("[SEGURIDAD] No hay token compartido configurado; el sistema rechazará paquetes y comandos hasta que ejecutes set_shared_token.py.")
 else:
     print(f"[SEGURIDAD] Token compartido cargado: {SHARED_TOKEN[:4]}***")
 
 
 def token_es_valido(token_recibido: Optional[str]) -> bool:
     """Acepta el token compartido cuando está presente y coincide con el valor cargado."""
+    # Fail-closed: if no shared token is configured, reject unless explicitly
+    # allowed by AGRODRONE_ALLOW_INSECURE environment variable.
     if not SHARED_TOKEN:
-        return True
+        return ALLOW_INSECURE
 
     if not isinstance(token_recibido, str):
         return False
@@ -386,7 +393,11 @@ def procesar_telemetria_dron(datos: dict):
     if "modo" in datos:
         drone_state["modo"] = datos["modo"]
     if "targetZone" in datos:
-        drone_state["targetZone"] = datos["targetZone"]
+        tz = datos["targetZone"]
+        if tz in VALID_ZONES:
+            drone_state["targetZone"] = tz
+        else:
+            print(f"[UDP] targetZone inválida en telemetría del dron: {tz!r}; se ignora y se deja el objetivo previo.")
     if isinstance(datos.get("position"), dict):
         drone_state["position"] = {
             "x": float(datos["position"].get("x", drone_state["position"]["x"])),
