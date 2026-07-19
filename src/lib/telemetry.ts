@@ -5,9 +5,9 @@ export type FlightStatus = 'idle' | 'ascenso' | 'navegando' | 'regando' | 'retor
 export type IrrigationStatus = 'active' | 'idle' | 'paused'
 
 export interface Coordinates {
-  latitude: number
-  longitude: number
-  altitude: number
+  xPct: number
+  yPct: number
+  zPct: number
 }
 
 /**
@@ -93,9 +93,9 @@ export interface TelemetryData {
 }
 
 const DEFAULT_COORDINATES: Coordinates = {
-  latitude: 0,
-  longitude: 0,
-  altitude: 0,
+  xPct: 0,
+  yPct: 0,
+  zPct: 0,
 }
 
 const DEFAULT_MAP_POSITION: MapPosition = { xPct: 0, yPct: 0, zPct: 0 }
@@ -190,11 +190,14 @@ const normalizeDroneState = (raw: any): DroneState => ({
   missionProgress: typeof raw?.missionProgress === 'number' ? raw.missionProgress : 0,
 })
 
-const normalizeCoordinates = (raw: any): Coordinates => ({
-  latitude: typeof raw?.latitude === 'number' ? raw.latitude : typeof raw?.x === 'number' ? raw.x : raw?.lat ?? 0,
-  longitude: typeof raw?.longitude === 'number' ? raw.longitude : typeof raw?.y === 'number' ? raw.y : raw?.lng ?? 0,
-  altitude: typeof raw?.altitude === 'number' ? raw.altitude : typeof raw?.z === 'number' ? raw.z : 0,
-})
+const normalizeCoordinates = (raw: any): Coordinates => {
+  const position = typeof raw?.position === 'object' && raw.position !== null ? raw.position : raw
+  return {
+    xPct: typeof position?.x === 'number' ? position.x : typeof position?.xPct === 'number' ? position.xPct : typeof position?.latitude === 'number' ? position.latitude : 0,
+    yPct: typeof position?.y === 'number' ? position.y : typeof position?.yPct === 'number' ? position.yPct : typeof position?.longitude === 'number' ? position.longitude : 0,
+    zPct: typeof position?.z === 'number' ? position.z : typeof position?.zPct === 'number' ? position.zPct : typeof position?.altitude === 'number' ? position.altitude : 0,
+  }
+}
 
 const normalizeMapPosition = (raw: any): MapPosition => ({
   xPct: typeof raw?.x === 'number' ? raw.x : raw?.xPct ?? 0,

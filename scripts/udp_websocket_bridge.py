@@ -454,8 +454,31 @@ async def websocket_handler(websocket):
         await websocket.close(code=1008, reason="Origin not allowed")
         return
 
-    connected_clients.add(websocket)
     client_ip = _get_client_ip(websocket)
+    if SHARED_TOKEN:
+        try:
+            first_message = await asyncio.wait_for(websocket.recv(), timeout=5)
+        except asyncio.TimeoutError:
+            print(f"[WS] Timeout de autenticación desde {client_ip}; cerrando conexion")
+            await websocket.close(code=1008, reason="Authentication required")
+            return
+        except websockets.exceptions.ConnectionClosed:
+            print(f"[WS] Conexion cerrada antes de autenticar desde {client_ip}")
+            return
+
+        try:
+            auth_payload = json.loads(first_message)
+        except json.JSONDecodeError:
+            print(f"[WS] Primer mensaje no es JSON válido desde {client_ip}; cerrando conexion")
+            await websocket.close(code=1008, reason="Authentication required")
+            return
+
+        if auth_payload.get("type") != "auth" or not token_es_valido(auth_payload.get("token")):
+            print(f"[WS] Autenticación fallida desde {client_ip}; cerrando conexion")
+            await websocket.close(code=1008, reason="Authentication required")
+            return
+
+    connected_clients.add(websocket)
     print(f"[WS] Nueva conexion desde {client_ip}")
 
     try:

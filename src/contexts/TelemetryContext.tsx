@@ -19,9 +19,13 @@ const TelemetryContext = createContext<TelemetryContextType | null>(null)
 export function TelemetryProvider({ children }: { children: ReactNode }) {
   const telemetryState = useTelemetry({
     wsUrl: typeof window !== 'undefined'
-      ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${
-          import.meta.env.VITE_WS_HOST || window.location.hostname
-        }:${import.meta.env.VITE_WS_PORT || '8765'}`
+      ? (() => {
+          const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+          const host = import.meta.env.VITE_WS_HOST || window.location.hostname
+          const preferredPort = import.meta.env.VITE_WS_PORT || '8765'
+          const ports = Array.from(new Set([preferredPort, '8765', '8766', '8767', '8768', '8769', '8770']))
+          return ports.map(port => `${protocol}://${host}:${port}`)
+        })()
       : '',
   })
 

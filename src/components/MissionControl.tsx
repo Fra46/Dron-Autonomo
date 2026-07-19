@@ -24,11 +24,13 @@ export default function MissionControl() {
   const missionActive = ['ascenso', 'navegando', 'regando', 'retorno'].includes(status)
   const canStop = ['ascenso', 'navegando', 'regando'].includes(status)
   const isAuto = telemetry.drone.mode === 'auto'
+  const showMissionButton = !isAuto || missionActive
+  const showZoneSelection = !isAuto && !missionActive
 
   const buttonLabel = isReturning
     ? 'Regresando a base...'
     : missionActive
-    ? 'Detener Misión'
+    ? (isAuto ? 'Detener misión' : 'Detener Misión')
     : `Iniciar misión a ${ZONE_LABELS[selectedZone]}`
 
   return (
@@ -60,7 +62,7 @@ export default function MissionControl() {
         </button>
       </div>
 
-      {!isAuto && !missionActive && (
+      {showZoneSelection && (
         <div className="zone-selection mb-3">
           <small className="text-secondary">Selecciona una zona objetivo</small>
           <div className="d-flex gap-2 flex-wrap mt-2">
@@ -78,13 +80,15 @@ export default function MissionControl() {
         </div>
       )}
 
-      {!isAuto && (
+      {showMissionButton && (
         <button
           className={`mission-btn ${missionActive ? 'active' : ''}`}
           disabled={isReturning}
           onClick={() => {
             if (!missionActive) {
-              startMission(selectedZone)
+              if (!isAuto) {
+                startMission(selectedZone)
+              }
             } else if (canStop) {
               stopMission()
             }

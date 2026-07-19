@@ -13,13 +13,14 @@ import {
 } from '@/lib/telemetrySocket'
 
 interface UseTelemetryOptions {
-  wsUrl?: string
+  wsUrl?: string | string[]
 }
 
 export function useTelemetry(options: UseTelemetryOptions = {}) {
   const {
     wsUrl = 'ws://127.0.0.1:8765',
   } = options
+  const wsUrls = Array.isArray(wsUrl) ? wsUrl : [wsUrl]
 
   const [telemetry, setTelemetry] = useState<TelemetryData>(DEFAULT_TELEMETRY)
   const [isConnected, setIsConnected] = useState(false)
@@ -29,9 +30,10 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
   const commandQueueRef = useRef<TelemetrySocketCommand[]>([])
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const shouldReconnectRef = useRef(true)
+  const connectionAttemptRef = useRef(0)
 
   // Parse WebSocket message from the bridge
-  const parseWSMessage = useCallback((data: string) => parseTelemetryMessage(data), [])
+  const parseWSMessage = useCallback((data: string | Record<string, unknown>) => parseTelemetryMessage(data), [])
 
   // WebSocket connection
   const connect = useCallback(() => {
@@ -39,14 +41,16 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
     if (socketRef.current) return
     if (typeof window === 'undefined') return
 
-    console.log('[Telemetry] Intentando conectar a WebSocket:', wsUrl)
+    const targetUrl = wsUrls[connectionAttemptRef.current % wsUrls.length]
+    console.log('[Telemetry] Intentando conectar a WebSocket:', targetUrl)
     try {
-      const socket = createTelemetrySocket(wsUrl, {
+      const socket = createTelemetrySocket(targetUrl, {
         onOpen: () => {
         console.log('[Telemetry] WebSocket conectado exitosamente')
+        connectionAttemptRef.current = 0
         setIsConnected(true)
         setConnectionError(null)
-
+        socketRef.current?.sendCommand({ type: 'auth' })
 
         if (commandQueueRef.current.length > 0) {
           console.log('[Telemetry] Enviando comandos encolados:', commandQueueRef.current)
@@ -160,6 +164,8 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
           return
         }
 
+        connectionAttemptRef.current = (connectionAttemptRef.current + 1) % wsUrls.length
+
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current)
         }
@@ -181,7 +187,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
       console.error('[Telemetry] Error al crear socket:', error)
       setConnectionError('Error al crear conexion')
     }
-  }, [wsUrl, parseWSMessage])
+  }, [wsUrls, parseWSMessage])
 
   // Send command to drone
   const sendCommand = useCallback((command: TelemetrySocketCommand) => {
