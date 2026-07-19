@@ -1,0 +1,8 @@
+{
+  "zones": {
+    "norte": { "map": { "xPct": 50, "yPct": 20 }, "world": { "x": 6.0, "y": 2.9 } },
+    "centro": { "map": { "xPct": 50, "yPct": 50 }, "world": { "x": 1.7, "y": 2.9 } },
+    "sur": { "map": { "xPct": 50, "yPct": 80 }, "world": { "x": -2.5, "y": 2.9 } }
+  },
+  "base": { "map": { "xPct": 15, "yPct": 50 }, "world": { "x": 1.65, "y": 6.32 } }
+}

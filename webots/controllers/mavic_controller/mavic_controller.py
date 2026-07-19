@@ -33,6 +33,17 @@ else:
 from shared_token_credentials import resolve_shared_token
 from humidity_thresholds import requiere_riego as requiere_riego_compartido
 
+try:
+    import json as _json
+    repo_root = Path(__file__).resolve().parents[2]
+    zone_layout_path = repo_root / 'shared' / 'zone_layout.json'
+    if zone_layout_path.exists():
+        ZONE_LAYOUT = _json.loads(zone_layout_path.read_text(encoding='utf-8'))
+    else:
+        ZONE_LAYOUT = None
+except Exception:
+    ZONE_LAYOUT = None
+
 resolve_shared_token()
 SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN", "")
 
@@ -54,8 +65,8 @@ TOLERANCIA_Z   = 0.08
 TIEMPO_RIEGO_S = 20.0
 
 COORDENADAS_ZONAS = {
-    "norte":  [ 6.0, 2.9],
-    "centro": [ 1.7, 2.9],
+    "norte":  [6.0, 2.9],
+    "centro": [1.7, 2.9],
     "sur":    [-2.5, 2.9],
 }
 

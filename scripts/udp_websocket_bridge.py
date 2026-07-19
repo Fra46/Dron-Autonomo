@@ -175,8 +175,7 @@ SHARED_TOKEN = (
 )
 
 if not SHARED_TOKEN:
-    print("[SEGURIDAD] No hay token compartido configurado; ejecuta set_shared_token.py "
-          "para habilitar la autenticación entre bridge, sensores y controlador.")
+    print("[SEGURIDAD] No hay token compartido configurado; el sistema queda en modo inseguro por defecto hasta que ejecutes set_shared_token.py.")
 else:
     print(f"[SEGURIDAD] Token compartido cargado: {SHARED_TOKEN[:4]}***")
 

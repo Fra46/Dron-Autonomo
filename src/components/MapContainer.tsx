@@ -3,6 +3,7 @@ import { ButtonGroup, Button } from 'react-bootstrap'
 import { useTelemetryContext } from '@/contexts/TelemetryContext'
 import { calculateHumidityLevel } from '@/lib/telemetry'
 import { getHumidityColor } from '@/lib/uiUtils'
+import zoneLayout from '../../shared/zone_layout.json'
 
 interface MapContainerProps {
   missionActive: boolean
@@ -18,13 +19,16 @@ interface ZoneNode {
 }
 
 const ZONE_LAYOUT: Record<ZoneNode['id'], { x: number; y: number }> = {
-  norte: { x: 50, y: 20 },
-  centro: { x: 50, y: 50 },
-  sur: { x: 50, y: 80 },
+  norte: { x: zoneLayout.zones.norte.map.xPct, y: zoneLayout.zones.norte.map.yPct },
+  centro: { x: zoneLayout.zones.centro.map.xPct, y: zoneLayout.zones.centro.map.yPct },
+  sur: { x: zoneLayout.zones.sur.map.xPct, y: zoneLayout.zones.sur.map.yPct },
 }
 
 // Posición de la base (agrícola) - Al OESTE de zona centro
-const BASE_POSITION = { x: 15, y: 50 }  // x < 50 = oeste, y = 50 = mismo nivel que centro
+const BASE_POSITION = {
+  x: zoneLayout.base.map.xPct,
+  y: zoneLayout.base.map.yPct,
+}
 
 const getHumidityLevel = calculateHumidityLevel
 const getHumidityCanvasColor = (humidity: number) => getHumidityColor(humidity)
