@@ -26,8 +26,23 @@ export function createTelemetrySocket(
   }
 
   const socket = new WebSocket(wsUrl)
+  const pendingCommands: TelemetrySocketCommand[] = []
+
+  const flushPendingCommands = () => {
+    while (pendingCommands.length > 0) {
+      const nextCommand = pendingCommands.shift()
+      if (!nextCommand) continue
+      if (socket.readyState === WebSocket.OPEN) {
+        const withToken = { ...nextCommand, token: nextCommand.token ?? SHARED_TOKEN }
+        socket.send(JSON.stringify(withToken))
+      } else {
+        break
+      }
+    }
+  }
 
   socket.onopen = () => {
+    flushPendingCommands()
     handlers.onOpen?.()
   }
 
@@ -45,12 +60,14 @@ export function createTelemetrySocket(
 
   return {
     sendCommand: command => {
+      const withToken = { ...command, token: command.token ?? SHARED_TOKEN }
       if (socket.readyState === WebSocket.OPEN) {
-        const withToken = { ...command, token: command.token ?? SHARED_TOKEN }
         socket.send(JSON.stringify(withToken))
         return true
       }
-      return false
+
+      pendingCommands.push(command)
+      return true
     },
     readyState: () => socket.readyState,
     close: () => {

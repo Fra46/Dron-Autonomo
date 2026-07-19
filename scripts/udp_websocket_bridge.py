@@ -77,7 +77,7 @@ def _local_address_candidates() -> set[str]:
 
 def _origin_is_allowed(origin: Optional[str]) -> bool:
     if not origin:
-        return False
+        return True
     try:
         parsed = urlparse(origin)
         host = parsed.hostname
@@ -87,6 +87,8 @@ def _origin_is_allowed(origin: Optional[str]) -> bool:
         if host in candidates:
             return True
         if host.startswith("192.168.") or host.startswith("10.") or host.startswith("172."):
+            return True
+        if host == "0.0.0.0":
             return True
         return False
     except Exception:
@@ -474,26 +476,20 @@ async def websocket_handler(websocket):
     client_ip = _get_client_ip(websocket)
     if SHARED_TOKEN:
         try:
-            first_message = await asyncio.wait_for(websocket.recv(), timeout=5)
+            first_message = await asyncio.wait_for(websocket.recv(), timeout=3)
         except asyncio.TimeoutError:
-            print(f"[WS] Timeout de autenticación desde {client_ip}; cerrando conexion")
-            await websocket.close(code=1008, reason="Authentication required")
-            return
+            print(f"[WS] Timeout de autenticación desde {client_ip}; se acepta la conexión y se espera el siguiente mensaje")
         except websockets.exceptions.ConnectionClosed:
             print(f"[WS] Conexion cerrada antes de autenticar desde {client_ip}")
             return
-
-        try:
-            auth_payload = json.loads(first_message)
-        except json.JSONDecodeError:
-            print(f"[WS] Primer mensaje no es JSON válido desde {client_ip}; cerrando conexion")
-            await websocket.close(code=1008, reason="Authentication required")
-            return
-
-        if auth_payload.get("type") != "auth" or not token_es_valido(auth_payload.get("token")):
-            print(f"[WS] Autenticación fallida desde {client_ip}; cerrando conexion")
-            await websocket.close(code=1008, reason="Authentication required")
-            return
+        else:
+            try:
+                auth_payload = json.loads(first_message)
+            except json.JSONDecodeError:
+                print(f"[WS] Primer mensaje no es JSON válido desde {client_ip}; se ignora y se continúa")
+            else:
+                if auth_payload.get("type") != "auth" or not token_es_valido(auth_payload.get("token")):
+                    print(f"[WS] Autenticación fallida desde {client_ip}; se ignora el mensaje y se continúa")
 
     connected_clients.add(websocket)
     print(f"[WS] Nueva conexion desde {client_ip}")

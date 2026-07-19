@@ -50,11 +50,11 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
         connectionAttemptRef.current = 0
         setIsConnected(true)
         setConnectionError(null)
-        socketRef.current?.sendCommand({ type: 'auth' })
+        socket?.sendCommand({ type: 'auth' })
 
         if (commandQueueRef.current.length > 0) {
           console.log('[Telemetry] Enviando comandos encolados:', commandQueueRef.current)
-          commandQueueRef.current.forEach(command => socketRef.current?.sendCommand(command))
+          commandQueueRef.current.forEach(command => socket?.sendCommand(command))
           commandQueueRef.current = []
         }
       },
