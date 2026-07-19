@@ -29,6 +29,7 @@ dev-dist/
 
 # Build output (Vite)
 *.local
+tsconfig.tsbuildinfo
 
 # Python
 __pycache__/

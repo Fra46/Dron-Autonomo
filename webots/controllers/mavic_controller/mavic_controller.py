@@ -30,6 +30,7 @@ else:
     print(f"[INFO] Añadido a sys.path: {script_path}")
 
 from shared_token_credentials import resolve_shared_token
+from humidity_thresholds import requiere_riego as requiere_riego_compartido
 
 resolve_shared_token()
 SHARED_TOKEN = os.environ.get("AGRODRONE_SHARED_TOKEN", "")
@@ -78,20 +79,8 @@ KP_POS = 0.18
 KD_POS = 0.45
 
 # ── 4. LÓGICA DIFUSA ─────────────────────────────────────────────────────────
-UMBRAL_ACTIVACION = 0.35  
-
-def mu_dry(h):
-    if h <= 30: return 1.0
-    if h >= 50: return 0.0
-    return (50 - h) / 20.0
-
-def mu_very_dry(h):
-    if h <= 20: return 1.0
-    if h >= 35: return 0.0
-    return (35 - h) / 15.0
-
 def requiere_riego(humedad: float) -> bool:
-    return (mu_dry(humedad) + mu_very_dry(humedad)) > UMBRAL_ACTIVACION
+    return requiere_riego_compartido(humedad)
 
 # ── 6. FUNCIONES DE CONTROL PID ──────────────────────────────────────────────
 def constrain(value, min_val, max_val):

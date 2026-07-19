@@ -1,0 +1,4 @@
+websockets>=10,<11
+earthaccess>=0.13,<0.14
+h5py>=3.12,<4
+requests>=2.32,<3

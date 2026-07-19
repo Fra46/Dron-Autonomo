@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   DEFAULT_TELEMETRY,
   TelemetryData,
+  calculateHumidityLevel,
   parseTelemetryMessage,
 } from '@/lib/telemetry'
 import {
@@ -55,7 +56,15 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
       },
       onMessage: (message) => {
         console.log('[Telemetry] Mensaje recibido:', message)
-        const parsed = parseWSMessage(message)
+
+        let raw: Record<string, any> | null = null
+        try {
+          raw = JSON.parse(message)
+        } catch {
+          raw = null
+        }
+
+        const parsed = parseWSMessage(raw ?? message)
 
         // Latencia real ida-y-vuelta: si este mensaje es el eco directo de un
         // request_status con client_ts, se calcula con el reloj del propio
@@ -63,16 +72,16 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
         let latencyUpdate: { pwaLatencyMs: number } | null = null
         let modeFromServer: 'auto' | 'manual' | null = null
         try {
-          const raw = JSON.parse(message)
-          if (typeof raw?.pingTs === 'number') {
-            latencyUpdate = { pwaLatencyMs: Date.now() - raw.pingTs }
+          const rawMessage = raw ?? {}
+          if (typeof rawMessage?.pingTs === 'number') {
+            latencyUpdate = { pwaLatencyMs: Date.now() - rawMessage.pingTs }
           }
           
           // Solo confiar en el modo del servidor si está explícitamente en el JSON crudo.
           // Esto evita que telemetrías genéricas reseteen el modo a 'auto'.
-          if (raw?.drone?.mode === 'manual' || raw?.drone?.modo === 'manual') {
+          if (rawMessage?.drone?.mode === 'manual' || rawMessage?.drone?.modo === 'manual') {
             modeFromServer = 'manual'
-          } else if (raw?.drone?.mode === 'auto' || raw?.drone?.modo === 'auto') {
+          } else if (rawMessage?.drone?.mode === 'auto' || rawMessage?.drone?.modo === 'auto') {
             modeFromServer = 'auto'
           }
         } catch {
@@ -100,15 +109,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
                 const smoothHum = prevHum + (incomingHum - prevHum) * SMOOTH_ALPHA
                 const estado = parsed.zones[key]?.estado ?? prev.zones[key].estado
                 const temperatura = parsed.zones[key]?.temperatura ?? prev.zones[key].temperatura
-                // Recalcular nivel según humedad suavizada
-                const nivel = (() => {
-                  if (smoothHum < 25) return 'lv0'
-                  if (smoothHum < 40) return 'lv1'
-                  if (smoothHum < 55) return 'lv2'
-                  if (smoothHum < 70) return 'lv3'
-                  if (smoothHum < 85) return 'lv4'
-                  return 'lv5'
-                })()
+                const nivel = calculateHumidityLevel(smoothHum)
 
                 newZones[key] = {
                   humedad: Math.round(smoothHum * 10) / 10,

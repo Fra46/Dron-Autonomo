@@ -224,9 +224,9 @@ const normalizeNodeReadings = (raw: any): TelemetryNodeReading[] => {
   }))
 }
 
-export const parseTelemetryMessage = (data: string): Partial<TelemetryData> | null => {
+export const parseTelemetryMessage = (data: string | Record<string, any>): Partial<TelemetryData> | null => {
   try {
-    const parsed = JSON.parse(data)
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data
 
     if (parsed.type === 'initial_state' || parsed.type === 'telemetry_update') {
       const zones = {

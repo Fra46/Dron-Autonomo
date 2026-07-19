@@ -98,14 +98,11 @@ npm install
 ### 3. Configurar Scripts Python
 
 ```bash
-# Instalar dependencias de Python
-pip install websockets
+# Instalar dependencias de Python con versiones fijadas
+python -m pip install -r requirements.txt
 
 # Opcional: para validar certificados TLS mkcert en el bridge
-pip install cryptography
-
-# Para datos satelitales de NASA
-pip install earthaccess h5py numpy
+python -m pip install cryptography
 ```
 
 ### 📖 Configuración de Credenciales NASA (Importante ⭐)

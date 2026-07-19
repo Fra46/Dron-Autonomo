@@ -86,6 +86,28 @@ def _origin_is_allowed(origin: Optional[str]) -> bool:
         return False
 
 
+def _get_websocket_headers(websocket) -> dict[str, str]:
+    request_headers = getattr(websocket, "request_headers", None)
+    if request_headers is not None:
+        return request_headers
+
+    request = getattr(websocket, "request", None)
+    if request is not None:
+        headers = getattr(request, "headers", None)
+        if headers is not None:
+            return headers
+
+    return {}
+
+
+def _get_client_ip(websocket) -> str:
+    remote_address = getattr(websocket, "remote_address", None)
+    if isinstance(remote_address, tuple) and remote_address:
+        return str(remote_address[0])
+    if isinstance(remote_address, str):
+        return remote_address
+    return "unknown"
+
 
 def _cert_sans(cert_path: Path) -> set[str]:
     try:
@@ -424,15 +446,16 @@ async def udp_receiver():
             await asyncio.sleep(0.1)
 
 async def websocket_handler(websocket):
-    origin = websocket.request_headers.get('Origin') or websocket.request_headers.get('origin')
+    headers = _get_websocket_headers(websocket)
+    origin = headers.get('Origin') or headers.get('origin')
     if not _origin_is_allowed(origin):
-        client_ip = websocket.remote_address[0] if websocket.remote_address else "unknown"
+        client_ip = _get_client_ip(websocket)
         print(f"[WS] Origen no permitido {origin!r} desde {client_ip}; cerrando conexion")
         await websocket.close(code=1008, reason="Origin not allowed")
         return
 
     connected_clients.add(websocket)
-    client_ip = websocket.remote_address[0] if websocket.remote_address else "unknown"
+    client_ip = _get_client_ip(websocket)
     print(f"[WS] Nueva conexion desde {client_ip}")
 
     try:
