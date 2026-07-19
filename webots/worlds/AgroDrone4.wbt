@@ -26,7 +26,7 @@ Solid {
       children [
         CadShape {
           url [
-            "../assets/terrain/farm-low-poly.obj"
+            "../assets/farm-low-poly.obj"
           ]
         }
       ]
@@ -47,7 +47,7 @@ Solid {
       children [
         CadShape {
           url [
-            "../assets/terrain/Sin_nombre.obj"
+            "../assets/crops-low-poly.obj"
           ]
         }
       ]
@@ -65,7 +65,7 @@ Solid {
       children [
         CadShape {
           url [
-            "../assets/terrain/Sin_nombre.obj"
+            "../assets/crops-low-poly.obj"
           ]
         }
       ]
@@ -79,13 +79,6 @@ Mavic2Pro {
   controller "mavic_controller"
   supervisor TRUE
 }
-
-# ── Gotas de agua (efecto visual de riego) ──────────────────────────────────
-# 10 esferas pequeñas y translúcidas, sin física ni boundingObject (solo
-# decorativas). El controlador (Supervisor) las mueve cada paso de
-# simulación via DEF, animándolas en caída libre cuando el dron está
-# REGANDO. Empiezan "aparcadas" muy por debajo del mapa (z = -50) para que
-# no se vean hasta que el controlador las active.
 DEF GOTA_0 Solid {
   translation 0 0 -50
   children [
@@ -98,7 +91,6 @@ DEF GOTA_0 Solid {
       }
       geometry Sphere {
         radius 0.025
-        subdivision 1
       }
     }
   ]
@@ -116,7 +108,6 @@ DEF GOTA_1 Solid {
       }
       geometry Sphere {
         radius 0.025
-        subdivision 1
       }
     }
   ]
@@ -134,7 +125,6 @@ DEF GOTA_2 Solid {
       }
       geometry Sphere {
         radius 0.025
-        subdivision 1
       }
     }
   ]
@@ -152,7 +142,6 @@ DEF GOTA_3 Solid {
       }
       geometry Sphere {
         radius 0.025
-        subdivision 1
       }
     }
   ]
@@ -170,7 +159,6 @@ DEF GOTA_4 Solid {
       }
       geometry Sphere {
         radius 0.025
-        subdivision 1
       }
     }
   ]
@@ -188,7 +176,6 @@ DEF GOTA_5 Solid {
       }
       geometry Sphere {
         radius 0.025
-        subdivision 1
       }
     }
   ]
@@ -206,7 +193,6 @@ DEF GOTA_6 Solid {
       }
       geometry Sphere {
         radius 0.025
-        subdivision 1
       }
     }
   ]
@@ -224,7 +210,6 @@ DEF GOTA_7 Solid {
       }
       geometry Sphere {
         radius 0.025
-        subdivision 1
       }
     }
   ]
@@ -242,7 +227,6 @@ DEF GOTA_8 Solid {
       }
       geometry Sphere {
         radius 0.025
-        subdivision 1
       }
     }
   ]
@@ -260,7 +244,6 @@ DEF GOTA_9 Solid {
       }
       geometry Sphere {
         radius 0.025
-        subdivision 1
       }
     }
   ]

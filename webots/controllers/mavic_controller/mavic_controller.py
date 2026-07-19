@@ -12,6 +12,7 @@ import time
 import random                      # Para la dispersion horizontal de las gotas de agua
 import os
 import sys
+import hmac
 from pathlib import Path
 
 # Asegura que el controlador Webots pueda importar módulos del repositorio
@@ -309,6 +310,14 @@ _ANCLAS_X_PCT = sorted(
     key=lambda par: par[0],
 )
 
+def token_valido(token_recibido: object) -> bool:
+    if not SHARED_TOKEN:
+        return True
+    if not isinstance(token_recibido, str):
+        return False
+    return hmac.compare_digest(token_recibido.strip(), SHARED_TOKEN)
+
+
 def proyectar_a_porcentaje(x_m: float, y_m: float):
     if abs(x_m - BASE_XY[0]) < 0.2 and abs(y_m - BASE_XY[1]) < 0.5:
         return {"x": 15.0, "y": 50.0, "z": 0.0}
@@ -474,6 +483,10 @@ while robot.step(timestep) != -1:
     try:
         data, _ = sock.recvfrom(4096)
         datos   = json.loads(data.decode("utf-8"))
+        if SHARED_TOKEN and not token_valido(datos.get("token")):
+            print("  [UDP] Paquete recibido con token inválido; ignorando.")
+            continue
+
         tipo    = datos.get("type")
 
         if tipo == "start_mission":

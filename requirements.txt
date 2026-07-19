@@ -1,4 +1,7 @@
 websockets>=10,<11
 earthaccess>=0.13,<0.14
 h5py>=3.12,<4
+numpy>=1.26,<2
 requests>=2.32,<3
+keyring>=25.0,<26
+cryptography>=42.0,<43
