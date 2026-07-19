@@ -98,12 +98,20 @@ npm install
 ### 3. Configurar Scripts Python
 
 ```bash
-# Instalar dependencias de Python con versiones fijadas
-python -m pip install -r requirements.txt
-
-# Opcional: para validar certificados TLS mkcert en el bridge
-python -m pip install cryptography
+# Opción recomendada: instalar todo de una vez
+npm run setup
 ```
+
+Esto instala las dependencias de Python y Node.js del proyecto en un solo paso.
+
+### 4. Arrancar el backend
+
+```bash
+cd scripts
+python start_backend.py
+```
+
+Este launcher inicia el bridge UDP/WebSocket y el sensor de forma simple para el uso del demo.
 
 ### 📖 Configuración de Credenciales NASA (Importante ⭐)
 
