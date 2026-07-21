@@ -9,7 +9,7 @@
 >
 > Este trabajo fue creado para competir en el evento **20CCC Cartagena 2026**, que se realizará del **12 al 14 de agosto de 2026**.
 
-Sistema completo de riego agrícola autónomo que combina un dron Mavic 2 Pro con sensores de humedad del suelo, procesamiento de datos en tiempo real y una interfaz web progresiva (PWA) para monitoreo y control remoto.
+Sistema completo de riego agrícola autónomo que combina **AgroDrone**, un hexacóptero de diseño propio construido específicamente para este proyecto, con sensores de humedad del suelo, procesamiento de datos en tiempo real y una interfaz web progresiva (PWA) para monitoreo y control remoto.
 
 ## 🌟 Características Principales
 
@@ -30,7 +30,7 @@ Sistema completo de riego agrícola autónomo que combina un dron Mavic 2 Pro co
 └─────────────────┘                                   │  (agregador con  │   + comandos de mision)  └──────────────┘
                                                       │     estado)      │
 ┌─────────────────┐                                   │                  │
-│ mavic_          │ ── UDP 5005 (drone_telemetry) ──► │                  │
+│ agrodrone_      │ ── UDP 5005 (drone_telemetry) ──► │                  │
 │ controller.py   │ ◄─ UDP 5006 (lecturas + cmds) ──  └──────────────────┘
 │ (Webots/Dron)   │
 └─────────────────┘
@@ -53,7 +53,7 @@ comandos de misión que la PWA envía por WebSocket (`start_mission`,
 | **Bridge UDP-WebSocket** | Python + WebSockets | Puente de comunicación |
 | **Simulador de Sensores** | Python | Datos de humedad simulados |
 | **Sensor NASA SMAP** | Python + EarthAccess | Datos satelitales reales |
-| **Controlador Mavic (Webots)** | Python + Webots API | Control del dron físico en simulación |
+| **Controlador AgroDrone (Webots)** | Python + Webots API | Control del dron físico en simulación |
 
 ## 🛠️ Tecnologías Utilizadas
 
@@ -72,7 +72,7 @@ comandos de misión que la PWA envía por WebSocket (`start_mission`,
 
 ### Simulación
 - **Webots** - Entorno de simulación robótica
-- **Mavic 2 Pro (Webots model)** - Control del dron
+- **AgroDrone Hexacóptero** - Modelo de dron agrícola diseñado desde cero para este proyecto (6 motores, aspersores integrados)
 
 ## 🚀 Instalación y Configuración
 
@@ -154,11 +154,17 @@ de telemetría.
 
 1. Instalar [Webots R2023b+](https://cyberbotics.com/)
 2. Abrir el proyecto de Webots incluido en `webots/`
-3. Abrir el mundo final `webots/worlds/AgroDrone4.wbt`
-4. Seleccionar el robot y asignar el controlador `webots/controllers/mavic_controller/mavic_controller.py`
+3. Abrir el mundo final `webots/worlds/AgroDrone2.wbt`
+4. Seleccionar el robot **"AgroDrone Hexacopter"** y verificar que tenga asignado el controlador `webots/controllers/agrodrone_controller/agrodrone_controller.py`
 5. Iniciar la simulación para que el controlador envíe telemetría al bridge UDP/WebSocket
 
-> 📌 Nota: la simulación final del proyecto es `AgroDrone4.wbt` y el controlador principal usado en la versión de entrega es `mavic_controller.py`.
+> 📌 Nota: el mundo y controlador principales del proyecto son `AgroDrone2.wbt` y
+> `agrodrone_controller.py` — el hexacóptero AgroDrone diseñado desde cero para
+> esta versión. Los mundos/controladores anteriores (`AgroDrone.wbt` con
+> Mavic 2 Pro, `AgroDrone3.wbt` con Crazyflie, `mavic_controller.py`,
+> `crazyflie_controller.py`) se conservan en el repositorio como iteraciones
+> históricas del desarrollo, pero ya no son el setup recomendado para correr
+> el proyecto.
 
 ## 📖 Uso
 
@@ -179,9 +185,10 @@ python sensor_nasa.py
 
 **Terminal 3 — Simulación del dron (Webots):**
 ```bash
-# Abrir el mundo de Webots y cargar mavic_controller.py como controlador
-# del robot. Emite telemetría real (posición, batería estimada, estado de
-# la máquina de estados) de vuelta al bridge en el puerto 5005.
+# Abrir webots/worlds/AgroDrone2.wbt y verificar que el robot "AgroDrone
+# Hexacopter" tenga cargado agrodrone_controller.py como controlador.
+# Emite telemetría real (posición, batería estimada, estado de la máquina
+# de estados) de vuelta al bridge en el puerto 5005.
 ```
 
 **Terminal 4 — PWA Frontend:**
@@ -198,7 +205,7 @@ npm run dev -- --host
 | Modo | Comando | Datos | Velocidad | Requisitos |
 |------|---------|-------|-----------|-----------|
 | **NASA SMAP Real** (recomendado) | `sensor_nasa.py` | Satélite real, con fallback simulado integrado | 🐢 Lento (1a) | Token Earthdata en keyring |
-| **Simulación Completa** | Webots + `mavic_controller.py` | Física realista + telemetría real del dron | 🐢 Muy lento | Webots instalado |
+| **Simulación Completa** | Webots + `agrodrone_controller.py` | Física realista + telemetría real del dron | 🐢 Muy lento | Webots instalado |
 
 ✅ **Nota:** Si `sensor_nasa.py` no tiene credenciales o falla la conexión remota, **automáticamente cambia a datos simulados** sin interrumpir el flujo de telemetría hacia la PWA.
 
@@ -228,10 +235,16 @@ Dron-autonomo/
 │   └── TELEMETRY.md           # Documentación detallada del protocolo de telemetría
 ├── 📁 webots/
 │   ├── controllers/
-│   │   └── mavic_controller/
-│   │       └── mavic_controller.py
+│   │   ├── agrodrone_controller/     # ⭐ Controlador principal (AgroDrone Hexacóptero)
+│   │   │   └── agrodrone_controller.py
+│   │   ├── mavic_controller/         # Iteración histórica (Mavic 2 Pro)
+│   │   │   └── mavic_controller.py
+│   │   └── crazyflie_controller/     # Iteración histórica (Crazyflie)
+│   │       └── crazyflie_controller.py
 │   └── worlds/
-│       └── AgroDrone4.wbt
+│       ├── AgroDrone2.wbt     # ⭐ Mundo principal (AgroDrone Hexacóptero)
+│       ├── AgroDrone.wbt      # Iteración histórica (Mavic 2 Pro)
+│       └── AgroDrone3.wbt     # Iteración histórica (Crazyflie)
 ├── index.html
 ├── package.json
 ├── vite.config.ts
@@ -247,8 +260,10 @@ Dron-autonomo/
 |--------|---------|-------------|
 | `sensor_nasa.py` | `python sensor_nasa.py` | Descarga datos reales NASA SMAP |
 | `udp_websocket_bridge.py` | `python udp_websocket_bridge.py` | Puente UDP ↔ WebSocket |
-| `mavic_controller.py` | `python mavic_controller.py` | Controlador del dron Webots |
+| `agrodrone_controller.py` | (asignado como controlador en Webots) | Controlador principal del dron Webots (AgroDrone Hexacóptero) |
 | `measure_bridge_latency.py` | `python measure_bridge_latency.py --samples 300` | Mide la latencia real extremo a extremo UDP → WebSocket (requiere el bridge corriendo) |
+
+> Los controladores `mavic_controller.py` y `crazyflie_controller.py` siguen en el repo como iteraciones históricas, pero no son el controlador recomendado para correr el proyecto.
 
 ### Scripts NPM
 
@@ -365,11 +380,11 @@ No uses certificados autofirmados no confiables en el móvil: el flujo correcto 
 | Frontend PWA | 3000 | HTTP | — |
 | Puente WebSocket | 8765 | WebSocket | Bridge ↔ PWA |
 | Bridge — entrada de telemetría | 5005 | UDP | Sensores de suelo → Bridge, Dron → Bridge |
-| Bridge — salida al controlador | 5006 | UDP | Bridge → `mavic_controller.py` (lecturas reenviadas + comandos de misión) |
+| Bridge — salida al controlador | 5006 | UDP | Bridge → `agrodrone_controller.py` (lecturas reenviadas + comandos de misión) |
 | Webots (opcional) | 1999 | TCP | — |
 
 > ⚠️ Importante: 5005 y 5006 son puertos distintos a propósito. Si ambos procesos
-> (`udp_websocket_bridge.py` y `mavic_controller.py` en Webots) intentaran
+> (`udp_websocket_bridge.py` y `agrodrone_controller.py` en Webots) intentaran
 > escuchar en el mismo puerto UDP en la misma máquina, uno de los dos fallaría
 > al iniciar (`Address already in use`).
 
@@ -400,11 +415,12 @@ por la PWA vía WebSocket y reenviados por el bridge al controlador por UDP:
 
 ### Lógica Difusa de Activación de Riego
 
-Implementada en `mavic_controller.py` exactamente como en las ecuaciones
+Implementada en `agrodrone_controller.py` exactamente como en las ecuaciones
 (1)-(3) del paper: se activa una misión cuando `μ_dry(h) + μ_very_dry(h) > θ`,
 con `θ = 0.35` en la implementación actual (el paper, Tabla 2, especifica
-+`θ = 0.65`; se redujo para activar riego preventivo en niveles de humedad
-+medios — ver comentario en `mavic_controller.py`).
+`θ = 0.65`; se redujo para activar riego preventivo en niveles de humedad
+medios — ver comentario en `scripts/humidity_thresholds.py`, fuente compartida
+de este umbral entre el controlador y el resto del sistema).
 
 ### Niveles de Humedad (color de interfaz)
 
@@ -446,10 +462,9 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 - **ACEIS** - Asociación Centro de Estudios de Ingeniería de Sistemas, Universidad Popular del Cesar
 - **Universidad Popular del Cesar** - Institución educativa
 - **NASA SMAP** - Datos satelitales de humedad del suelo
-- **DJI** - Mavic 2 Pro drone platform
+- **DJI / Bitcraze** - Modelos Mavic 2 Pro y Crazyflie usados como referencia en iteraciones previas del proyecto, antes del diseño propio de AgroDrone
 - **Cyberbotics** - Webots simulation software
 
 ---
 
-⭐ **Si este proyecto te resulta útil, ¡dale una estrella!**</content>
-<filePath>README.md
+⭐ **Si este proyecto te resulta útil, ¡dale una estrella!**

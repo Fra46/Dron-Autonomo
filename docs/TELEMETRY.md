@@ -15,7 +15,7 @@
 └─────────────────┘                                   │  (agregador con  │   + comandos de misión)  └──────────────┘
                                                       │     estado)      │
 ┌─────────────────┐                                   │                  │
-│ mavic_          │ ── UDP 5005 (drone_telemetry) ──► │                  │
+│ agrodrone_      │ ── UDP 5005 (drone_telemetry) ──► │                  │
 │ controller.py   │ ◄─ UDP 5006 (lecturas + cmds) ──  └──────────────────┘
 │ (Webots/Dron)   │
 └─────────────────┘
@@ -36,7 +36,7 @@ python udp_websocket_bridge.py
 
 El puente escuchará en:
 - **UDP 5005:** entrada — sensores de suelo Y telemetría del dron
-- **UDP 5006 (saliente):** hacia `mavic_controller.py` — reenvía lecturas de suelo y comandos de misión
+- **UDP 5006 (saliente):** hacia `agrodrone_controller.py` — reenvía lecturas de suelo y comandos de misión
 - **WebSocket 8765:** hacia la PWA
 
 ## Paso 2: Iniciar el Sensor de Datos (NASA SMAP es la fuente principal)
@@ -62,10 +62,11 @@ La PWA se conecta automáticamente al WebSocket en `ws://localhost:8765`.
 ## Paso 4: Ejecutar el Dron en Webots
 
 ```bash
-# En Webots, cargar el controlador mavic_controller.py como controlador del robot.
-# Escucha en el puerto UDP 5006 (lecturas de suelo reenviadas + comandos de misión)
-# y envía su telemetría real (posición, batería estimada, estado FSM) al bridge
-# por UDP en el puerto 5005.
+# En Webots, abrir webots/worlds/AgroDrone2.wbt y verificar que el robot
+# "AgroDrone Hexacopter" tenga cargado agrodrone_controller.py como
+# controlador. Escucha en el puerto UDP 5006 (lecturas de suelo reenviadas +
+# comandos de misión) y envía su telemetría real (posición, batería
+# estimada, estado FSM) al bridge por UDP en el puerto 5005.
 ```
 
 ## Formato de Datos
@@ -99,7 +100,7 @@ respaldo si un sensor viejo no lo envía (`procesar_lectura_suelo` en
 (Estas etiquetas son descriptivas; la decisión real de activar el riego la
 toma la lógica difusa del controlador, ver más abajo — no un umbral fijo aquí.)
 
-### Entrada UDP al bridge — telemetría del dron (mavic_controller.py → bridge, puerto 5005)
+### Entrada UDP al bridge — telemetría del dron (agrodrone_controller.py → bridge, puerto 5005)
 
 ```json
 {
@@ -112,23 +113,32 @@ toma la lógica difusa del controlador, ver más abajo — no un umbral fijo aqu
   "position": {"x": 50.0, "y": 65.0, "z": 0.0},
   "targetPosition": {"x": 50.0, "y": 80.0, "z": 0.0},
   "altitude": 1.97,
-  "modo": "auto"
+  "modo": "auto",
+  "missionProgress": 0.35
 }
 ```
 
 `position`/`targetPosition` ya vienen proyectadas al espacio porcentual 0-100
 que usa el mapa de la PWA (`ZONE_LAYOUT` en `MapContainer.tsx`), no en metros
-de Webots — ver `proyectar_a_porcentaje()` en `mavic_controller.py`. Su
+de Webots — ver `proyectar_a_porcentaje()` en `agrodrone_controller.py`. Su
 campo `z` siempre es `0.0` (el mapa es 2D); la altitud real en metros viaja
 por separado en el campo `altitude` de nivel superior.
-`battery` se reporta fija en 100% (es una simulación en Webots, no hay batería
-física que consumir). `waterLevel` sí es una **estimación** por tiempo
-transcurrido de riego (Webots no expone un sensor real de nivel de tanque).
-`modo` refleja si el controlador está en `"auto"` (riega por su cuenta) o
-`"manual"` (solo por botón — ver sección "Modo de operación" más abajo).
+`battery` se reporta decreciente mientras el dron está en vuelo y se recupera
+lentamente en base (es una simulación en Webots, no hay batería física real
+que consumir — ver `enviar_telemetria()`). `waterLevel` también es una
+**estimación** por tiempo transcurrido de riego (Webots no expone un sensor
+real de nivel de tanque). `modo` refleja si el controlador está en `"auto"`
+(riega por su cuenta) o `"manual"` (solo por botón — ver sección "Modo de
+operación" más abajo). `missionProgress` (0.0-1.0) es el progreso de la
+**fase actual** del vuelo (ascenso/navegando/regando/retorno/descenso), usado
+por `MissionControl.tsx` para la barra de progreso real.
 
-> Nota: muchas referencias de diseño usan `crazyflie_controller.py` por historial,
-> pero la implementación actual del robot en Webots es `mavic_controller.py`.
+> Nota: el robot y controlador principales del proyecto son el hexacóptero
+> **"AgroDrone Hexacopter"** (`webots/worlds/AgroDrone2.wbt`) y
+> `agrodrone_controller.py`. Iteraciones anteriores del desarrollo
+> (`crazyflie_controller.py` sobre el Crazyflie, `mavic_controller.py` sobre
+> el Mavic 2 Pro) se conservan en el repositorio como referencia histórica,
+> pero ya no son el setup recomendado para correr el proyecto.
 
 
 ### Salida WebSocket del bridge → PWA (snapshot agregado)
@@ -151,7 +161,8 @@ transcurrido de riego (Webots no expone un sensor real de nivel de tanque).
     "waterLevel": 96.0,
     "speed": 0.42,
     "altitude": 1.97,
-    "modo": "auto"
+    "modo": "auto",
+    "missionProgress": 0.35
   },
   "coordinates": {"x": 50.0, "y": 65.0, "z": 0.0},
   "targetPosition": {"x": 50.0, "y": 80.0, "z": 0.0},
@@ -186,12 +197,12 @@ Esta escala es independiente de la lógica difusa de activación de riego (abajo
 ## Estados del Dron (Máquina de Estados)
 
 | Estado     | Descripción                                    |
-|------------|------------------------------------------------|
+|------------|--------------------------------------------------|
 | `idle`     | En tierra, motores apagados, esperando alerta  |
-| `ascenso`  | Subiendo hasta altura de crucero (1.0m)        |
+| `ascenso`  | Subiendo hasta altura de crucero (2.0m)        |
 | `navegando`| Volando hacia la zona con humedad crítica      |
 | `regando`  | Hover fijo sobre la zona, aplicando riego      |
-| `retorno`  | Volviendo a la base [0, 0]                     |
+| `retorno`  | Volviendo a la base                            |
 | `descenso` | Bajando controladamente hasta aterrizar        |
 
 ## Coordenadas de Zonas (Webots/Virtual Planet)
@@ -205,12 +216,12 @@ COORDENADAS_ZONAS = {
 BASE_XY = [1.65, 6.32]
 
 ALTURA_OBJETIVO = 2.0    # Metros
-TOLERANCIA_XY   = 0.15   # Metros
+TOLERANCIA_XY   = 0.20   # Metros (agrodrone_controller.py)
 TIEMPO_RIEGO_S  = 20.0   # Segundos
 ```
 
 Las tres zonas comparten la misma `y` real (2.9) y solo varían en `x`;
-`proyectar_a_porcentaje()` en `mavic_controller.py` interpola linealmente
+`proyectar_a_porcentaje()` en `agrodrone_controller.py` interpola linealmente
 la `x` real del dron contra esas tres anclas (`sur→80%`, `centro→50%`,
 `norte→20%` en el eje vertical del mapa) y recorta el resultado a `[0,100]`
 para posiciones fuera de rango, como la base — así, si alguien reajusta estas
@@ -223,7 +234,9 @@ El controlador tiene 2 modos, elegibles desde el switch en `MissionControl.tsx`
 (comando `set_mode`):
 
 - **`auto`** (por defecto): en cuanto la lógica difusa detecta una zona seca
-  y el dron está en `IDLE`, despega solo, sin esperar ningún botón.
+  y el dron está en `IDLE` (o, en `agrodrone_controller.py`, incluso durante
+  `RETORNO`/`DESCENSO` si aparece una nueva zona seca), despega o redirige
+  su misión sin esperar ningún botón.
 - **`manual`**: el dron solo despega cuando la PWA envía `start_mission`.
 
 En cualquiera de los 2 modos, si al iniciar una misión *otras* zonas ya
@@ -245,14 +258,16 @@ def mu_very_dry(h):    # ecuacion 2: 1 si h<=20, (35-h)/15 si 20<h<35, 0 si h>=3
 def requiere_riego(humedad):
     return (mu_dry(humedad) + mu_very_dry(humedad)) > UMBRAL_ACTIVACION
 ```
-+
-+> ⚠️ **Nota de implementación:** el paper (sección 2.3, Tabla 2) especifica
-+> `theta = 0.65`. En la implementación actual (`mavic_controller.py`) se redujo
-+> a `0.35` para que el dron riegue preventivamente cuando la humedad está en
-+> nivel "medio" (~40-55%), en vez de esperar a que baje a "bajo" (~25-40%).
-+> Esto evita transiciones bruscas de humedad de nivel medio directo a crítico.
-+> Si necesitas replicar exactamente el paper, cambia `UMBRAL_ACTIVACION` de
-+> vuelta a `0.65`.
+
+> ⚠️ **Nota de implementación:** el paper (sección 2.3, Tabla 2) especifica
+> `theta = 0.65`. En la implementación actual se redujo a `0.35` para que el
+> dron riegue preventivamente cuando la humedad está en nivel "medio"
+> (~40-55%), en vez de esperar a que baje a "bajo" (~25-40%). Esto evita
+> transiciones bruscas de humedad de nivel medio directo a crítico. Estas
+> funciones viven en `scripts/humidity_thresholds.py` (fuente compartida por
+> `agrodrone_controller.py`, `sensor_nasa.py` y el bridge) y se leen desde
+> `shared/humidity_thresholds.json`. Si necesitas replicar exactamente el
+> paper, cambia `activation` de vuelta a `0.65` en ese JSON.
 
 ## Comandos desde la PWA
 
@@ -316,12 +331,16 @@ para que se vea en vivo durante la demo, incluso desde un teléfono.
 - El puente debe mostrar "UDP recibido" o el log de `procesar_lectura_suelo` en la consola
 
 ### El dron no responde en Webots / no llega telemetría del dron
--- El controlador `mavic_controller.py` debe escuchar en el puerto **5006**,
+- El controlador `agrodrone_controller.py` debe escuchar en el puerto **5006**,
   no 5005 (5005 lo usa el bridge para recibir; si el controlador también
   intentara bindear 5005 en la misma máquina, fallaría con
   `Address already in use`).
 - Verifica que `BRIDGE_HOST`/`BRIDGE_TELEMETRY_PORT` en el controlador
   apunten a `127.0.0.1:5005`.
+- Confirma en el árbol de escena de Webots que el robot **"AgroDrone
+  Hexacopter"** (en `AgroDrone2.wbt`) tenga asignado el controlador
+  `agrodrone_controller`, y no `mavic_controller` o `crazyflie_controller`
+  por error tras cambiar de mundo.
 
 ## Requisitos
 
