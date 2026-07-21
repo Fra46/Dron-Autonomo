@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   DEFAULT_TELEMETRY,
   TelemetryData,
@@ -20,7 +20,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
   const {
     wsUrl = 'ws://127.0.0.1:8765',
   } = options
-  const wsUrls = Array.isArray(wsUrl) ? wsUrl : [wsUrl]
+  const wsUrls = useMemo(() => Array.isArray(wsUrl) ? wsUrl : [wsUrl], [wsUrl])
 
   const [telemetry, setTelemetry] = useState<TelemetryData>(DEFAULT_TELEMETRY)
   const [isConnected, setIsConnected] = useState(false)
@@ -159,6 +159,7 @@ export function useTelemetry(options: UseTelemetryOptions = {}) {
         console.log('[Telemetry] WebSocket desconectado')
         setIsConnected(false)
         socketRef.current = null
+        console.log('[Telemetry] Conexión cerrada en cliente')
 
         if (!shouldReconnectRef.current) {
           return

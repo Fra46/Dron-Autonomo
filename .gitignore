@@ -26,6 +26,7 @@ dev-dist/
 
 # Webots editor / proyecto local
 *.wbproj
+webots/worlds/*.jpg
 
 # Build output (Vite)
 *.local

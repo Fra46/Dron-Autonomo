@@ -1,0 +1,1281 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+
+WorldInfo {
+  # Agregado: el mundo oficial de Webots para el Mavic 2 Pro real
+  # (projects/robots/dji/mavic/worlds/mavic_2_pro.wbt) define este
+  # defaultDamping explicitamente. Sin el, Webots NO aplica ningun
+  # arrastre/resistencia al movimiento por defecto - una vez que el dron
+  # agarra velocidad, nada fisico se le opone salvo lo que el controlador
+  # logre corregir activamente con el termino D. Esto es probablemente la
+  # causa principal de que pequeños errores de despegue se conviertan en
+  # ascensos que ya no se pueden frenar a tiempo.
+  defaultDamping Damping {
+    linear 0.5
+    angular 0.5
+  }
+}
+Viewpoint {
+  orientation 0.10686980700543805 0.060699016465780735 -0.9924184972836345 2.1150777910993925
+  position 7.103216679726899 12.950650591876496 2.866016090766051
+  follow "AgroDrone Hexacopter"
+  followType "Mounted Shot"
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Solid {
+  translation 0.00969008 0.0199909 0.020005
+  rotation 0.5773509358554485 0.5773489358556708 0.5773509358554485 2.0944
+  children [
+    Transform {
+      scale 0.1 0.1 0.1
+      children [
+        CadShape {
+          url [
+            "../assets/terrain/farm-low-poly.obj"
+          ]
+        }
+      ]
+    }
+  ]
+  name "terrain"
+}
+RectangleArena {
+  translation 1.65 6.32 -0.15
+  floorSize 1.5 1.5
+}
+Solid {
+  translation -0.876958 269.39 34.69
+  rotation -0.9831056944488314 0.1294279597735375 0.1294279597735375 -1.5878353071795859
+  children [
+    Transform {
+      translation 71.36 -34.69 261.31
+      scale 0.1 0.1 0.1
+      children [
+        CadShape {
+          url [
+            "../assets/terrain/crops-low-poly.obj"
+          ]
+        }
+      ]
+    }
+  ]
+  name "crop1"
+}
+Solid {
+  translation -0.876958 269.39 34.69
+  rotation -0.9831056944488314 0.1294279597735375 0.1294279597735375 -1.5878353071795859
+  children [
+    Transform {
+      translation 67.44 -34.69 262.49
+      scale 0.1 0.1 0.1
+      children [
+        CadShape {
+          url [
+            "../assets/terrain/crops-low-poly.obj"
+          ]
+        }
+      ]
+    }
+  ]
+  name "crop2"
+}
+Robot {
+  translation 1.6459324004321083 6.327794550702064 -0.13223543240267743
+  rotation 5.281270699440295e-13 -9.262320540487803e-13 -1 1.7057003590952395
+  children [
+    DEF BODY_SLOT Group {
+    }
+    Transform {
+      rotation 1 0 0 1.5708
+      scale 9 9 9
+      children [
+        CadShape {
+          url [
+            "../assets/robot/drone-foragriculturelow-poly.obj"
+          ]
+        }
+      ]
+    }
+    DEF COMPASS Compass {
+    }
+    DEF GPS GPS {
+    }
+    DEF GYRO Gyro {
+    }
+    DEF INERTIAL_UNIT InertialUnit {
+    }
+    DEF MOTOR_0_HELIX Propeller {
+      shaftAxis 0 0 1
+      centerOfThrust 0.891 0 0.486
+      thrustConstants 0.00026 0
+      torqueConstants 5.2e-06 0
+      fastHelixThreshold 45
+      device RotationalMotor {
+        name "motor frontal"
+        maxVelocity 620
+        maxTorque 40
+      }
+      fastHelix Solid {
+        translation 0.891 0 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.05 0.05 0.05
+              transparency 0.55
+              roughness 0.4
+              metalness 0
+            }
+            geometry Cylinder {
+              height 0.01
+              radius 0.375
+              side FALSE
+            }
+          }
+        ]
+        boundingObject Cylinder {
+          height 0.02
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+      slowHelix Solid {
+        translation 0.891 0 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.08 0.08 0.08
+              roughness 0.6
+              metalness 0.1
+            }
+            geometry Box {
+              size 0.75 0.025 0.006
+            }
+          }
+          Pose {
+            rotation 0 0 1 1.5708
+            children [
+              Shape {
+                appearance PBRAppearance {
+                  baseColor 0.08 0.08 0.08
+                  roughness 0.6
+                  metalness 0.1
+                }
+                geometry Box {
+                  size 0.75 0.025 0.006
+                }
+              }
+            ]
+          }
+        ]
+        name "motor frontal"
+        boundingObject Cylinder {
+          height 0.015
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+    }
+    DEF MOTOR_1_HELIX Propeller {
+      shaftAxis 0 0 1
+      centerOfThrust 0.441 -0.774 0.486
+      thrustConstants -0.00026 0
+      torqueConstants 5.2e-06 0
+      fastHelixThreshold 45
+      device RotationalMotor {
+        name "motor frontal derecha"
+        maxVelocity 620
+        maxTorque 40
+      }
+      fastHelix Solid {
+        translation 0.441 -0.774 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.05 0.05 0.05
+              transparency 0.55
+              roughness 0.4
+              metalness 0
+            }
+            geometry Cylinder {
+              height 0.01
+              radius 0.375
+              side FALSE
+            }
+          }
+        ]
+        boundingObject Cylinder {
+          height 0.02
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+      slowHelix Solid {
+        translation 0.441 -0.774 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.08 0.08 0.08
+              roughness 0.6
+              metalness 0.1
+            }
+            geometry Box {
+              size 0.75 0.025 0.006
+            }
+          }
+          Pose {
+            rotation 0 0 1 1.5708
+            children [
+              Shape {
+                appearance PBRAppearance {
+                  baseColor 0.08 0.08 0.08
+                  roughness 0.6
+                  metalness 0.1
+                }
+                geometry Box {
+                  size 0.75 0.025 0.006
+                }
+              }
+            ]
+          }
+        ]
+        name "motor frontal derecha"
+        boundingObject Cylinder {
+          height 0.015
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+    }
+    DEF MOTOR_2_HELIX Propeller {
+      shaftAxis 0 0 1
+      centerOfThrust -0.45 -0.774 0.486
+      thrustConstants 0.00026 0
+      torqueConstants 5.2e-06 0
+      fastHelixThreshold 45
+      device RotationalMotor {
+        name "motor trasera derecha"
+        maxVelocity 620
+        maxTorque 40
+      }
+      fastHelix Solid {
+        translation -0.45 -0.774 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.05 0.05 0.05
+              transparency 0.55
+              roughness 0.4
+              metalness 0
+            }
+            geometry Cylinder {
+              height 0.01
+              radius 0.375
+              side FALSE
+            }
+          }
+        ]
+        boundingObject Cylinder {
+          height 0.02
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+      slowHelix Solid {
+        translation -0.45 -0.774 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.08 0.08 0.08
+              roughness 0.6
+              metalness 0.1
+            }
+            geometry Box {
+              size 0.75 0.025 0.006
+            }
+          }
+          Pose {
+            rotation 0 0 1 1.5708
+            children [
+              Shape {
+                appearance PBRAppearance {
+                  baseColor 0.08 0.08 0.08
+                  roughness 0.6
+                  metalness 0.1
+                }
+                geometry Box {
+                  size 0.75 0.025 0.006
+                }
+              }
+            ]
+          }
+        ]
+        name "motor trasera derecha"
+        boundingObject Cylinder {
+          height 0.015
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+    }
+    DEF MOTOR_3_HELIX Propeller {
+      shaftAxis 0 0 1
+      centerOfThrust -0.891 0 0.486
+      thrustConstants -0.00026 0
+      torqueConstants 5.2e-06 0
+      fastHelixThreshold 45
+      device RotationalMotor {
+        name "motor trasera"
+        maxVelocity 620
+        maxTorque 40
+      }
+      fastHelix Solid {
+        translation -0.891 0 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.05 0.05 0.05
+              transparency 0.55
+              roughness 0.4
+              metalness 0
+            }
+            geometry Cylinder {
+              height 0.01
+              radius 0.375
+              side FALSE
+            }
+          }
+        ]
+        boundingObject Cylinder {
+          height 0.02
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+      slowHelix Solid {
+        translation -0.891 0 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.08 0.08 0.08
+              roughness 0.6
+              metalness 0.1
+            }
+            geometry Box {
+              size 0.75 0.025 0.006
+            }
+          }
+          Pose {
+            rotation 0 0 1 1.5708
+            children [
+              Shape {
+                appearance PBRAppearance {
+                  baseColor 0.08 0.08 0.08
+                  roughness 0.6
+                  metalness 0.1
+                }
+                geometry Box {
+                  size 0.75 0.025 0.006
+                }
+              }
+            ]
+          }
+        ]
+        name "motor trasera"
+        boundingObject Cylinder {
+          height 0.015
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+    }
+    DEF MOTOR_4_HELIX Propeller {
+      shaftAxis 0 0 1
+      centerOfThrust -0.441 0.774 0.486
+      thrustConstants 0.00026 0
+      torqueConstants 5.2e-06 0
+      fastHelixThreshold 45
+      device RotationalMotor {
+        name "motor trasera izquierda"
+        maxVelocity 620
+        maxTorque 40
+      }
+      fastHelix Solid {
+        translation -0.441 0.774 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.05 0.05 0.05
+              transparency 0.55
+              roughness 0.4
+              metalness 0
+            }
+            geometry Cylinder {
+              height 0.01
+              radius 0.375
+              side FALSE
+            }
+          }
+        ]
+        boundingObject Cylinder {
+          height 0.02
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+      slowHelix Solid {
+        translation -0.441 0.774 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.08 0.08 0.08
+              roughness 0.6
+              metalness 0.1
+            }
+            geometry Box {
+              size 0.75 0.025 0.006
+            }
+          }
+          Pose {
+            rotation 0 0 1 1.5708
+            children [
+              Shape {
+                appearance PBRAppearance {
+                  baseColor 0.08 0.08 0.08
+                  roughness 0.6
+                  metalness 0.1
+                }
+                geometry Box {
+                  size 0.75 0.025 0.006
+                }
+              }
+            ]
+          }
+        ]
+        name "motor trasera izquierda"
+        boundingObject Cylinder {
+          height 0.015
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+    }
+    DEF MOTOR_5_HELIX Propeller {
+      shaftAxis 0 0 1
+      centerOfThrust 0.45 0.774 0.486
+      thrustConstants -0.00026 0
+      torqueConstants 5.2e-06 0
+      fastHelixThreshold 45
+      device RotationalMotor {
+        name "motor frontal izquierda"
+        maxVelocity 620
+        maxTorque 40
+      }
+      fastHelix Solid {
+        translation 0.45 0.774 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.05 0.05 0.05
+              transparency 0.55
+              roughness 0.4
+              metalness 0
+            }
+            geometry Cylinder {
+              height 0.01
+              radius 0.375
+              side FALSE
+            }
+          }
+        ]
+        boundingObject Cylinder {
+          height 0.02
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+      slowHelix Solid {
+        translation 0.45 0.774 0.486
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.08 0.08 0.08
+              roughness 0.6
+              metalness 0.1
+            }
+            geometry Box {
+              size 0.75 0.025 0.006
+            }
+          }
+          Pose {
+            rotation 0 0 1 1.5708
+            children [
+              Shape {
+                appearance PBRAppearance {
+                  baseColor 0.08 0.08 0.08
+                  roughness 0.6
+                  metalness 0.1
+                }
+                geometry Box {
+                  size 0.75 0.025 0.006
+                }
+              }
+            ]
+          }
+        ]
+        name "motor frontal izquierda"
+        boundingObject Cylinder {
+          height 0.015
+          radius 0.375
+        }
+        physics Physics {
+          density -1
+          mass 0.03
+        }
+      }
+    }
+  ]
+  name "AgroDrone Hexacopter"
+  model "AgroDrone - Hexacoptero de riego de precision"
+  boundingObject Group {
+    children [
+      Pose {
+        translation 0 0 0.405
+        children [
+          Box {
+            size 1.17 1.17 0.81
+          }
+        ]
+      }
+      Pose {
+        translation 0 0 0.207
+        children [
+          Cylinder {
+            height 0.45
+            radius 0.54
+          }
+        ]
+      }
+      Pose {
+        translation 0.4455 0 0.405
+        children [
+          Box {
+            size 0.891 0.18 0.162
+          }
+        ]
+      }
+      Pose {
+        translation 0.2205 -0.387 0.405
+        rotation 0 0 1 -1.052903
+        children [
+          Box {
+            size 0.890818 0.18 0.162
+          }
+        ]
+      }
+      Pose {
+        translation -0.225 -0.387 0.405
+        rotation 0 0 1 -2.097424
+        children [
+          Box {
+            size 0.895308 0.18 0.162
+          }
+        ]
+      }
+      Pose {
+        translation -0.4455 0 0.405
+        rotation 0 0 1 3.141593
+        children [
+          Box {
+            size 0.891 0.18 0.162
+          }
+        ]
+      }
+      Pose {
+        translation -0.2205 0.387 0.405
+        rotation 0 0 1 2.088689
+        children [
+          Box {
+            size 0.890818 0.18 0.162
+          }
+        ]
+      }
+      Pose {
+        translation 0.225 0.387 0.405
+        rotation 0 0 1 1.044169
+        children [
+          Box {
+            size 0.895308 0.18 0.162
+          }
+        ]
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.6
+    centerOfMass [
+      0 0 0.315
+    ]
+  }
+  controller "agrodrone_controller"
+  supervisor TRUE
+}
+DEF GOTA_0 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+      }
+    }
+  ]
+  name "gota_0"
+}
+DEF GOTA_1 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+      }
+    }
+  ]
+  name "gota_1"
+}
+DEF GOTA_2 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+      }
+    }
+  ]
+  name "gota_2"
+}
+DEF GOTA_3 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+      }
+    }
+  ]
+  name "gota_3"
+}
+DEF GOTA_4 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+      }
+    }
+  ]
+  name "gota_4"
+}
+DEF GOTA_5 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+      }
+    }
+  ]
+  name "gota_5"
+}
+DEF GOTA_6 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+      }
+    }
+  ]
+  name "gota_6"
+}
+DEF GOTA_7 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+      }
+    }
+  ]
+  name "gota_7"
+}
+DEF GOTA_8 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.025
+      }
+    }
+  ]
+  name "gota_8"
+}
+DEF GOTA_9 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_9"
+}
+DEF GOTA_10 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_10"
+}
+DEF GOTA_11 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_11"
+}
+DEF GOTA_12 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_12"
+}
+DEF GOTA_13 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_13"
+}
+DEF GOTA_14 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_14"
+}
+DEF GOTA_15 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_15"
+}
+DEF GOTA_16 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_16"
+}
+DEF GOTA_17 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_17"
+}
+DEF GOTA_18 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_18"
+}
+DEF GOTA_19 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_19"
+}
+DEF GOTA_20 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_20"
+}
+DEF GOTA_21 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_21"
+}
+DEF GOTA_22 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_22"
+}
+DEF GOTA_23 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_23"
+}
+DEF GOTA_24 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_24"
+}
+DEF GOTA_25 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_25"
+}
+DEF GOTA_26 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_26"
+}
+DEF GOTA_27 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_27"
+}
+DEF GOTA_28 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_28"
+}
+DEF GOTA_29 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_29"
+}
+DEF GOTA_30 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_30"
+}
+DEF GOTA_31 Solid {
+  translation 0 0 -50
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.25
+        roughness 0.25
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.03
+      }
+    }
+  ]
+  name "gota_31"
+}
+
+DEF SPRAY_0 Transform {
+  translation 0 0 -50
+  rotation 1 0 0 1.5708
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.30 0.70 1
+        transparency 0.55
+        roughness 0.2
+        metalness 0
+      }
+      geometry Cylinder {
+        radius 0.12
+        height 2.4
+      }
+    }
+  ]
+}
+
+DEF SPRAY_1 Transform {
+  translation 0 0 -50
+  rotation 1 0 0 1.5708
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.7
+        roughness 0.2
+        metalness 0
+      }
+      geometry Cylinder {
+        radius 0.08
+        height 0.9
+      }
+    }
+  ]
+}
+
+DEF SPRAY_2 Transform {
+  translation 0 0 -50
+  rotation 1 0 0 1.5708
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.7
+        roughness 0.2
+        metalness 0
+      }
+      geometry Cylinder {
+        radius 0.08
+        height 0.9
+      }
+    }
+  ]
+}
+
+DEF SPRAY_3 Transform {
+  translation 0 0 -50
+  rotation 1 0 0 1.5708
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.65 1
+        transparency 0.7
+        roughness 0.2
+        metalness 0
+      }
+      geometry Cylinder {
+        radius 0.08
+        height 0.9
+      }
+    }
+  ]
+}

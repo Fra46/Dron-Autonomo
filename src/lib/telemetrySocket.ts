@@ -51,10 +51,16 @@ export function createTelemetrySocket(
   }
 
   socket.onerror = event => {
+    console.error('[TelemetrySocket] onerror', event)
     handlers.onError?.(event)
   }
 
-  socket.onclose = () => {
+  socket.onclose = event => {
+    console.warn('[TelemetrySocket] onclose', {
+      code: event.code,
+      reason: event.reason,
+      wasClean: event.wasClean,
+    })
     handlers.onClose?.()
   }
 

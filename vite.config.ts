@@ -6,16 +6,23 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  return {
-    plugins: [
-      react(),
-      mkcert(),
+  const useHttps = (env.VITE_USE_HTTPS || '').toLowerCase() === 'true'
+
+  const plugins = [react()]
+  if (useHttps) {
+    plugins.push(mkcert())
+  }
+
+  // Register PWA plugin only in production to avoid service worker
+  // interfering with local development and WebSocket debugging.
+  if (mode === 'production') {
+    plugins.push(
       VitePWA({
         registerType: 'autoUpdate',
         injectRegister: 'auto',
         includeAssets: ['icon-192.png', 'icon-512.png'],
         devOptions: {
-          enabled: true
+          enabled: false
         },
         manifestFilename: 'manifest.webmanifest',
         manifest: {
@@ -46,7 +53,11 @@ export default defineConfig(({ mode }) => {
           dir: 'ltr'
         }
       })
-    ],
+    )
+  }
+
+  return {
+    plugins,
     server: {
       port: Number(env.VITE_PORT) || 3000,
       host: true,

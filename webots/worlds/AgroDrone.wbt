@@ -9,7 +9,7 @@ WorldInfo {
 }
 Viewpoint {
   orientation 0.1424948191006224 0.08668145007751636 -0.9859926737770114 2.061039490496087
-  position 4.780010242887402 10.560362756173623 1.8445218015706193
+  position 5.297610902197613 11.560049364124755 2.1768415944965955
   follow "Mavic 2 PRO"
   followType "Mounted Shot"
 }
@@ -26,7 +26,7 @@ Solid {
       children [
         CadShape {
           url [
-            "../assets/farm-low-poly.obj"
+            "../assets/terrain/farm-low-poly.obj"
           ]
         }
       ]
@@ -47,7 +47,7 @@ Solid {
       children [
         CadShape {
           url [
-            "../assets/crops-low-poly.obj"
+            "../assets/terrain/crops-low-poly.obj"
           ]
         }
       ]
@@ -65,7 +65,7 @@ Solid {
       children [
         CadShape {
           url [
-            "../assets/crops-low-poly.obj"
+            "../assets/terrain/crops-low-poly.obj"
           ]
         }
       ]

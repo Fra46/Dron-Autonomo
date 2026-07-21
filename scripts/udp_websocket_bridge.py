@@ -33,6 +33,7 @@ import socket
 import time
 import os
 import ssl
+import traceback
 from pathlib import Path
 from urllib.parse import urlparse
 from shared_token_credentials import resolve_shared_token
@@ -400,7 +401,11 @@ def procesar_telemetria_dron(datos: dict):
         drone_state["modo"] = datos["modo"]
     if "targetZone" in datos:
         tz = datos["targetZone"]
-        if tz in VALID_ZONES:
+        if tz is None:
+            # El controlador puede enviar targetZone: None cuando no quiere actualizar
+            # el objetivo actual; eso no es un error y no debe llenar los logs.
+            pass
+        elif isinstance(tz, str) and tz in VALID_ZONES:
             drone_state["targetZone"] = tz
         else:
             print(f"[UDP] targetZone inválida en telemetría del dron: {tz!r}; se ignora y se deja el objetivo previo.")
@@ -478,13 +483,22 @@ async def websocket_handler(websocket):
         return
 
     client_ip = _get_client_ip(websocket)
+    # Log request info for debugging intermittent disconnects
+    try:
+        req_path = getattr(websocket, 'path', None)
+        remote = getattr(websocket, 'remote_address', None)
+        print(f"[WS] Handshake headers from {client_ip}: {headers}")
+        print(f"[WS] Request path={req_path} remote={remote}")
+    except Exception:
+        pass
     if SHARED_TOKEN:
         try:
             first_message = await asyncio.wait_for(websocket.recv(), timeout=3)
         except asyncio.TimeoutError:
             print(f"[WS] Timeout de autenticación desde {client_ip}; se acepta la conexión y se espera el siguiente mensaje")
-        except websockets.exceptions.ConnectionClosed:
-            print(f"[WS] Conexion cerrada antes de autenticar desde {client_ip}")
+            first_message = None
+        except websockets.exceptions.ConnectionClosed as e:
+            print(f"[WS] Conexion cerrada antes de autenticar desde {client_ip}; code={getattr(e, 'code', 'unknown')} reason={getattr(e, 'reason', 'unknown')}")
             return
         else:
             try:
@@ -499,8 +513,35 @@ async def websocket_handler(websocket):
     print(f"[WS] Nueva conexion desde {client_ip}")
 
     try:
-        await websocket.send(json.dumps({**build_snapshot(), "type": "initial_state"}))
+        # Allow the client a short moment to finish any local setup (some
+        # browsers/PWAs may immediately close the socket if they aren't ready
+        # to process an incoming message). This small delay reduces race
+        # conditions where the client closes during the server's first send.
+        await asyncio.sleep(0.05)
 
+        if getattr(websocket, "closed", False):
+            print(f"[WS] Conexión ya cerrada antes de enviar estado inicial: {client_ip}")
+            return
+
+        print(f"[WS] Enviando estado inicial a {client_ip}")
+        await websocket.send(json.dumps({**build_snapshot(), "type": "initial_state"}))
+        print(f"[WS] Estado inicial enviado a {client_ip}")
+
+    except websockets.exceptions.ConnectionClosed as e:
+        print(f"[WS] ConnectionClosed al enviar estado inicial a {client_ip}: code={getattr(e, 'code', 'unknown')} reason={getattr(e, 'reason', 'unknown')}")
+        return
+    except Exception as e:
+        print(f"[WS] Error al enviar estado inicial a {client_ip}: {e}")
+        print(traceback.format_exc())
+        try:
+            if not getattr(websocket, "closed", False):
+                await websocket.close()
+        except Exception:
+            pass
+        print(f"[WS] Conexion cerrada durante envio inicial: {client_ip}")
+        return
+
+    try:
         async for message in websocket:
             try:
                 cmd = json.loads(message)
@@ -534,8 +575,8 @@ async def websocket_handler(websocket):
             else:
                 print(f"[WS] Comando desconocido ignorado: {cmd}")
 
-    except websockets.exceptions.ConnectionClosed:
-        print(f"[WS] Conexion cerrada: {client_ip}")
+    except websockets.exceptions.ConnectionClosed as e:
+        print(f"[WS] Conexion cerrada: {client_ip}; code={getattr(e, 'code', 'unknown')} reason={getattr(e, 'reason', 'unknown')}")
     finally:
         connected_clients.discard(websocket)
 
