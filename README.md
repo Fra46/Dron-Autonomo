@@ -104,15 +104,6 @@ npm run setup
 
 Esto instala las dependencias de Python y Node.js del proyecto en un solo paso.
 
-### 4. Arrancar el backend
-
-```bash
-cd scripts
-python start_backend.py
-```
-
-Este launcher inicia el bridge UDP/WebSocket y el sensor de forma simple para el uso del demo.
-
 ### 📖 Configuración de Credenciales NASA (Importante ⭐)
 
 Para usar **datos reales del satélite SMAP de NASA** con `scripts/sensor_nasa.py`,
